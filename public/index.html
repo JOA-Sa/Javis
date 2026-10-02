@@ -1,0 +1,523 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="theme-color" content="#0a0e17">
+    <title>JARVIS — Command Center</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=Rajdhani:wght@500;600;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg: #090d16;
+            --surface: #111827;
+            --surface-elevated: #1f293d;
+            --border: #1e293b;
+            --cyan: #00f0ff;
+            --cyan-glow: rgba(0, 240, 255, 0.25);
+            --blue: #3b82f6;
+            --red: #ef4444;
+            --green: #10b981;
+            --text-primary: #f8fafc;
+            --text-secondary: #94a3b8;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            -webkit-tap-highlight-color: transparent;
+            font-family: 'Inter', sans-serif;
+        }
+
+        body {
+            background-color: var(--bg);
+            color: var(--text-primary);
+            min-height: 100vh;
+            padding: 16px;
+            padding-bottom: 80px;
+        }
+
+        h1, h2, h3, .hud-title {
+            font-family: 'Rajdhani', sans-serif;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        /* Top Header */
+        header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding-bottom: 16px;
+            border-bottom: 1px solid var(--border);
+            margin-bottom: 20px;
+        }
+
+        .brand {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .pulse-indicator {
+            width: 10px;
+            height: 10px;
+            background: var(--cyan);
+            border-radius: 50%;
+            box-shadow: 0 0 10px var(--cyan);
+            animation: pulse 2s infinite;
+        }
+
+        @keyframes pulse {
+            0% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(0, 240, 255, 0.7); }
+            70% { transform: scale(1.1); box-shadow: 0 0 0 10px rgba(0, 240, 255, 0); }
+            100% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(0, 240, 255, 0); }
+        }
+
+        .brand h1 {
+            font-size: 24px;
+            font-weight: 700;
+            background: linear-gradient(90deg, var(--cyan), var(--blue));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        .settings-btn {
+            background: none;
+            border: 1px solid var(--border);
+            color: var(--text-secondary);
+            padding: 6px 12px;
+            border-radius: 6px;
+            font-size: 13px;
+            cursor: pointer;
+        }
+
+        /* Section Layout */
+        .section-title {
+            font-size: 14px;
+            font-weight: 600;
+            color: var(--cyan);
+            margin-bottom: 12px;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        /* Grid */
+        .grid-scenes {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 12px;
+            margin-bottom: 24px;
+        }
+
+        .btn-card {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 16px;
+            display: flex;
+            flex-direction: column;
+            align-items: flex-start;
+            gap: 6px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .btn-card:active {
+            transform: scale(0.97);
+            border-color: var(--cyan);
+            box-shadow: 0 0 15px var(--cyan-glow);
+        }
+
+        .btn-card .icon {
+            font-size: 24px;
+        }
+
+        .btn-card .name {
+            font-family: 'Rajdhani', sans-serif;
+            font-weight: 700;
+            font-size: 16px;
+            color: var(--text-primary);
+        }
+
+        .btn-card .desc {
+            font-size: 11px;
+            color: var(--text-secondary);
+        }
+
+        /* Telemetry Cards */
+        .telemetry-container {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: 14px;
+            padding: 16px;
+            margin-bottom: 24px;
+        }
+
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 12px;
+            margin-top: 10px;
+        }
+
+        .stat-item {
+            background: var(--surface-elevated);
+            padding: 12px;
+            border-radius: 8px;
+            border-left: 3px solid var(--cyan);
+        }
+
+        .stat-label {
+            font-size: 11px;
+            color: var(--text-secondary);
+            text-transform: uppercase;
+        }
+
+        .stat-value {
+            font-size: 18px;
+            font-weight: 700;
+            font-family: 'Rajdhani', sans-serif;
+            color: var(--text-primary);
+            margin-top: 2px;
+        }
+
+        /* Volume Controls */
+        .controls-card {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: 14px;
+            padding: 16px;
+            margin-bottom: 24px;
+            display: flex;
+            flex-direction: column;
+            gap: 16px;
+        }
+
+        .slider-group {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+
+        .slider-header {
+            display: flex;
+            justify-content: space-between;
+            font-size: 13px;
+            font-weight: 500;
+        }
+
+        input[type="range"] {
+            -webkit-appearance: none;
+            width: 100%;
+            height: 6px;
+            background: var(--surface-elevated);
+            border-radius: 3px;
+            outline: none;
+        }
+
+        input[type="range"]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            appearance: none;
+            width: 20px;
+            height: 20px;
+            border-radius: 50%;
+            background: var(--cyan);
+            cursor: pointer;
+            box-shadow: 0 0 10px var(--cyan);
+        }
+
+        /* Media Controls */
+        .media-row {
+            display: flex;
+            justify-content: center;
+            gap: 16px;
+            margin-top: 8px;
+        }
+
+        .media-btn {
+            background: var(--surface-elevated);
+            border: 1px solid var(--border);
+            color: var(--text-primary);
+            width: 50px;
+            height: 50px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 18px;
+            cursor: pointer;
+        }
+
+        .media-btn:active {
+            background: var(--cyan);
+            color: #000;
+        }
+
+        /* Quick Action Row */
+        .action-pills {
+            display: flex;
+            gap: 10px;
+            overflow-x: auto;
+            padding-bottom: 8px;
+            margin-bottom: 24px;
+        }
+
+        .action-pill {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            color: var(--text-primary);
+            padding: 10px 16px;
+            border-radius: 20px;
+            font-size: 13px;
+            font-weight: 500;
+            white-space: nowrap;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .action-pill:active {
+            border-color: var(--cyan);
+        }
+
+        /* Toast feedback */
+        #toast {
+            position: fixed;
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(16, 24, 39, 0.95);
+            backdrop-filter: blur(10px);
+            border: 1px solid var(--cyan);
+            color: var(--cyan);
+            padding: 12px 24px;
+            border-radius: 30px;
+            font-size: 14px;
+            font-weight: 600;
+            display: none;
+            z-index: 1000;
+            box-shadow: 0 4px 20px rgba(0, 240, 255, 0.3);
+        }
+
+        /* Screenshot modal */
+        #screenshotModal {
+            position: fixed;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0,0,0,0.85);
+            display: none;
+            justify-content: center;
+            align-items: center;
+            z-index: 2000;
+            padding: 20px;
+        }
+
+        #screenshotModal img {
+            max-width: 100%;
+            max-height: 80vh;
+            border-radius: 8px;
+            border: 1px solid var(--cyan);
+        }
+    </style>
+</head>
+<body>
+
+    <header>
+        <div class="brand">
+            <div class="pulse-indicator"></div>
+            <h1>JARVIS</h1>
+        </div>
+        <button class="settings-btn" onclick="configurarApiKey()">⚙️ API Key</button>
+    </header>
+
+    <!-- Modos de Cena -->
+    <div class="section-title">🎬 Cenários Rápidos</div>
+    <div class="grid-scenes">
+        <div class="btn-card" onclick="executar('/api/gaming')">
+            <span class="icon">🎮</span>
+            <span class="name">Gaming Mode</span>
+            <span class="desc">TV + G15 Max + Steam</span>
+        </div>
+        <div class="btn-card" onclick="executar('/api/pirata')">
+            <span class="icon">🍿</span>
+            <span class="name">Modo Pirata</span>
+            <span class="desc">TV + Navegador Cheio</span>
+        </div>
+        <div class="btn-card" onclick="executar('/api/trabalho')">
+            <span class="icon">💻</span>
+            <span class="name">Modo Foco</span>
+            <span class="desc">Tela no G15 + TV Off</span>
+        </div>
+        <div class="btn-card" onclick="executar('/api/espelho')">
+            <span class="icon">🖥️</span>
+            <span class="name">Espelhar TV</span>
+            <span class="desc">Clone na Samsung 55"</span>
+        </div>
+        <div class="btn-card" onclick="executar('/api/noturno')">
+            <span class="icon">🌙</span>
+            <span class="name">Modo Noturno</span>
+            <span class="desc">Áudio e coolers baixos</span>
+        </div>
+        <div class="btn-card" onclick="executar('/api/silencio')">
+            <span class="icon">🔇</span>
+            <span class="name">Silêncio Total</span>
+            <span class="desc">Mute PC e TV</span>
+        </div>
+    </div>
+
+    <!-- Telemetria Dell G15 -->
+    <div class="section-title">⚡ Telemetria — Dell G15 5525</div>
+    <div class="telemetry-container">
+        <div style="display:flex; justify-content:space-between; align-items:center;">
+            <span style="font-size:12px; color:var(--text-secondary);" id="planoTxt">Plano: Carregando...</span>
+            <button class="settings-btn" onclick="carregarStats()" style="padding:4px 8px;">🔄 Atualizar</button>
+        </div>
+        <div class="stats-grid">
+            <div class="stat-item">
+                <div class="stat-label">Uso de CPU</div>
+                <div class="stat-value" id="cpuVal">--%</div>
+            </div>
+            <div class="stat-item">
+                <div class="stat-label">Memória RAM</div>
+                <div class="stat-value" id="ramVal">-- GB</div>
+            </div>
+            <div class="stat-item">
+                <div class="stat-label">Bateria</div>
+                <div class="stat-value" id="batVal">--%</div>
+            </div>
+            <div class="stat-item">
+                <div class="stat-label">GPU NVIDIA</div>
+                <div class="stat-value" id="gpuVal">--°C</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Mídia e Áudio -->
+    <div class="section-title">🔊 Áudio & Mídia do Sistema</div>
+    <div class="controls-card">
+        <div class="slider-group">
+            <div class="slider-header">
+                <span>Volume Dell G15</span>
+                <span id="volPcLbl">50%</span>
+            </div>
+            <input type="range" id="volPcSlider" min="0" max="100" value="50" onchange="ajustarVolumePC(this.value)">
+        </div>
+
+        <div class="slider-group">
+            <div class="slider-header">
+                <span>Volume TV Samsung Crystal</span>
+                <span id="volTvLbl">30</span>
+            </div>
+            <input type="range" id="volTvSlider" min="0" max="100" value="30" onchange="ajustarVolumeTV(this.value)">
+        </div>
+
+        <div class="media-row">
+            <button class="media-btn" onclick="executar('/api/sistema/midia/prev')">⏮️</button>
+            <button class="media-btn" onclick="executar('/api/sistema/midia/playpause')">⏯️</button>
+            <button class="media-btn" onclick="executar('/api/sistema/midia/next')">⏭️</button>
+        </div>
+    </div>
+
+    <!-- Ações Rápidas -->
+    <div class="section-title">🛠️ Ações do Sistema</div>
+    <div class="action-pills">
+        <div class="action-pill" onclick="abrirScreenshot()">📸 Ver Tela</div>
+        <div class="action-pill" onclick="executar('/api/sistema/bloquear')">🔒 Bloquear PC</div>
+        <div class="action-pill" onclick="executar('/api/sistema/limpar')">🧹 Limpar RAM</div>
+        <div class="action-pill" onclick="executar('/api/tv/ligar')">📺 Ligar TV</div>
+        <div class="action-pill" onclick="executar('/api/tv/desligar')">💤 Desligar TV</div>
+        <div class="action-pill" onclick="executar('/api/desligar?delay=30')">🛑 Desligar PC</div>
+        <div class="action-pill" onclick="executar('/api/cancelar-desligamento')">↩️ Cancelar</div>
+    </div>
+
+    <!-- Toast Notification -->
+    <div id="toast">Comando executado!</div>
+
+    <!-- Screenshot Modal -->
+    <div id="screenshotModal" onclick="this.style.display='none'">
+        <img id="screenshotImg" src="" alt="Captura de tela">
+    </div>
+
+    <script>
+        function getHeaders() {
+            const key = localStorage.getItem('jarvis_api_key');
+            return key ? { 'x-api-key': key } : {};
+        }
+
+        function showToast(msg) {
+            const toast = document.getElementById('toast');
+            toast.innerText = msg;
+            toast.style.display = 'block';
+            setTimeout(() => toast.style.display = 'none', 3000);
+        }
+
+        async function executar(url) {
+            try {
+                showToast('Executando...');
+                const res = await fetch(url, { headers: getHeaders() });
+                const data = await res.json();
+                if (res.ok) {
+                    showToast('✅ ' + (data.acao || data.status || 'Sucesso'));
+                } else {
+                    showToast('❌ ' + (data.erro || 'Falha'));
+                }
+            } catch (e) {
+                showToast('❌ Falha na conexão com Jarvis');
+            }
+        }
+
+        function ajustarVolumePC(val) {
+            document.getElementById('volPcLbl').innerText = val + '%';
+            executar(`/api/volume/${val}`);
+        }
+
+        function ajustarVolumeTV(val) {
+            document.getElementById('volTvLbl').innerText = val;
+            executar(`/api/tv/volume/${val}`);
+        }
+
+        async function carregarStats() {
+            try {
+                const res = await fetch('/api/sistema/stats', { headers: getHeaders() });
+                const data = await res.json();
+                if (data.stats) {
+                    const s = data.stats;
+                    document.getElementById('cpuVal').innerText = s.cpu_pct + '%';
+                    document.getElementById('ramVal').innerText = s.ram_usada + ' GB';
+                    document.getElementById('batVal').innerText = s.bateria ? s.bateria + '%' : 'N/A';
+                    document.getElementById('gpuVal').innerText = s.gpu_temp ? s.gpu_temp + '°C' : 'N/A';
+                    document.getElementById('planoTxt').innerText = 'Plano: ' + s.plano;
+                }
+            } catch (e) {}
+        }
+
+        function abrirScreenshot() {
+            showToast('📸 Capturando tela...');
+            const modal = document.getElementById('screenshotModal');
+            const img = document.getElementById('screenshotImg');
+            const key = localStorage.getItem('jarvis_api_key');
+            img.src = '/api/sistema/screenshot?t=' + Date.now() + (key ? '&key=' + key : '');
+            modal.style.display = 'flex';
+        }
+
+        function configurarApiKey() {
+            const atual = localStorage.getItem('jarvis_api_key') || '';
+            const nova = prompt('Informe a API_KEY configurada no seu .env:', atual);
+            if (nova !== null) {
+                localStorage.setItem('jarvis_api_key', nova.trim());
+                showToast('Chave salva!');
+                carregarStats();
+            }
+        }
+
+        // Auto-refresh stats inicial
+        carregarStats();
+        setInterval(carregarStats, 15000);
+    </script>
+</body>
+</html>
