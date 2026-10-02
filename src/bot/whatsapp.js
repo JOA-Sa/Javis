@@ -7,6 +7,9 @@ const st = require('../services/smartthings.service');
 const dell = require('../services/dell.service');
 const sistema = require('../services/sistema.service');
 const ia = require('../services/ia.service');
+const tts = require('../services/tts.service');
+const monitor = require('../services/monitor.service');
+const downloader = require('../services/downloader.service');
 
 // ─────────────────────────────────────────────────
 //  CLIENTE WHATSAPP COM AUTO-RECONEXÃO
@@ -32,12 +35,16 @@ const criarCliente = () => {
 
     client.on('ready', () => {
         reconectando = false;
-        console.log('[📱] Bot Jarvis conectado! Pronto para comandos de texto e áudio.');
+        console.log('[📱] Bot Jarvis conectado! Pronto para comandos de texto, áudio e voz.');
         console.log('[📋] Digite !ajuda no WhatsApp para ver os comandos.\n');
+
+        // Inicia o monitoramento proativo de bateria e temperatura do Dell G15
+        monitor.iniciarMonitor(client);
     });
 
     client.on('disconnected', (reason) => {
         console.log(`[⚠️] Bot desconectado: ${reason}`);
+        monitor.pararMonitor();
         if (!reconectando) tentarReconectar();
     });
 
@@ -123,7 +130,7 @@ const MODO_CMDS = {
 // ─────────────────────────────────────────────────
 
 const mensagemAjuda = () => [
-    '*🤖 Jarvis — Central de Comandos:*\n',
+    '*🤖 Jarvis — Central de Comandos Completa:*\n',
 
     '*🎬 Cenários Rápidos:*',
     ...Object.entries(CENAS).map(([cmd, i]) => `• *${cmd}* — ${i.desc}`),
@@ -140,6 +147,8 @@ const mensagemAjuda = () => [
     '\n*⏯️ Controle de Mídia:*',
     '• *!play* / *!pause* — Play/Pause global',
     '• *!proxima* / *!anterior* — Passar faixa',
+    '• *!baixar <link>* — Baixa vídeo ou magnet de torrent',
+    '• *!falar <texto>* — Jarvis responde com nota de voz',
 
     '\n*📺 Samsung Crystal 55" (SmartThings):*',
     '• *!tv ligar / desligar / mute*',
@@ -147,21 +156,41 @@ const mensagemAjuda = () => [
     '• *!tv hdmi1 / hdmi2 / hdmi3*',
     '• *!tv netflix / youtube / prime / disney*',
 
-    '\n*🎙️ Comandos por Voz e Linguagem Natural:*',
-    'Você também pode enviar *áudios* ou frases comuns (ex: _"vou jogar"_, _"pausa o vídeo"_, _"como tá o pc?"_).',
+    '\n*🎙️ Interação por Voz:*',
+    'Envie áudios de voz ou frases naturais (ex: _"Jarvis, vou jogar"_, _"pausa o filme"_). Ele responderá em texto e áudio!',
 
     '\n_Envie o comando e aguarde a confirmação!_',
 ].join('\n');
 
 // ─────────────────────────────────────────────────
+//  HELPER DE RESPOSTA EM ÁUDIO
+// ─────────────────────────────────────────────────
+
+async function responderComVoz(msg, texto) {
+    try {
+        const audioPath = await tts.falar(texto);
+        if (fs.existsSync(audioPath)) {
+            const media = MessageMedia.fromFilePath(audioPath);
+            await msg.reply(media, undefined, { sendAudioAsVoice: true });
+            fs.unlink(audioPath, () => {});
+        }
+    } catch (e) {
+        // Falha no áudio não impede o fluxo
+    }
+}
+
+// ─────────────────────────────────────────────────
 //  EXECUÇÃO DE INTENÇÕES (IA / NLP)
 // ─────────────────────────────────────────────────
 
-async function executarIntencao(intencao, msg) {
+async function executarIntencao(intencao, msg, eraAudio = false) {
     if (!intencao || !intencao.comando) return;
 
     if (intencao.resposta) {
         await msg.reply(`🤖 ${intencao.resposta}`);
+        if (eraAudio) {
+            await responderComVoz(msg, intencao.resposta);
+        }
     }
 
     const { comando, parametro } = intencao;
@@ -221,7 +250,7 @@ async function handleMensagem(msg) {
             const media = await msg.downloadMedia();
             if (media && media.data) {
                 const intencao = await ia.interpretarAudio(media.data, media.mimetype);
-                await executarIntencao(intencao, msg);
+                await executarIntencao(intencao, msg, true);
             }
         } catch (err) {
             console.error('[❌] Erro ao processar áudio:', err.message);
@@ -244,7 +273,7 @@ async function handleMensagem(msg) {
             const intencao = await ia.interpretarTexto(texto);
             if (intencao && intencao.comando && intencao.comando !== 'conversa') {
                 console.log(`[🧠] Intenção detectada para "${texto}":`, intencao.comando);
-                await executarIntencao(intencao, msg);
+                await executarIntencao(intencao, msg, false);
             }
         } catch (e) {
             console.error('[⚠️] Erro na interpretação natural:', e.message);
@@ -253,8 +282,8 @@ async function handleMensagem(msg) {
     }
 
     // ── 3. Comandos com prefixo "!" ─────────────────
-    const partes  = texto.toLowerCase().split(/\s+/);
-    const comando = partes[0];
+    const partes  = texto.split(/\s+/);
+    const comando = partes[0].toLowerCase();
 
     console.log(`[💬] Comando: ${texto}`);
 
@@ -262,6 +291,22 @@ async function handleMensagem(msg) {
         // Ajuda e Utilidades
         if (comando === '!ajuda') return msg.reply(mensagemAjuda());
         if (comando === '!hora')  return msg.reply(`🕐 ${sistema.hora()}`);
+
+        // Voz do Jarvis sob demanda
+        if (comando === '!falar') {
+            const falaTexto = partes.slice(1).join(' ');
+            if (!falaTexto) return msg.reply('❌ Uso: *!falar <texto a ser dito>*');
+            return responderComVoz(msg, falaTexto);
+        }
+
+        // Downloader de Vídeos e Torrents
+        if (comando === '!baixar') {
+            const link = partes[1];
+            if (!link) return msg.reply('❌ Uso: *!baixar <link do youtube, video ou magnet>*');
+            msg.reply('⏳ Iniciando processamento do download...');
+            const res = await downloader.baixarMidia(link);
+            return msg.reply(`✅ ${res}`);
+        }
 
         // Telemetria e Captura de Tela
         if (comando === '!pc') {
@@ -323,7 +368,7 @@ async function handleMensagem(msg) {
             if (!st.isConfigured()) {
                 return msg.reply('❌ SmartThings não configurado.\nAdicione SMARTTHINGS_TOKEN e SMARTTHINGS_TV_DEVICE_ID no .env');
             }
-            const sub = partes[1];
+            const sub = partes[1]?.toLowerCase();
             if (!sub) return msg.reply('❌ Uso: !tv ligar | desligar | volume 50 | mute | hdmi1 | netflix | youtube | prime');
 
             if (sub === 'volume') {
@@ -339,7 +384,7 @@ async function handleMensagem(msg) {
 
         // Plano de Energia Dell G15
         if (comando === '!modo') {
-            const sub = partes[1];
+            const sub = partes[1]?.toLowerCase();
             const modoFn = sub ? MODO_CMDS[sub] : null;
             if (!modoFn) return msg.reply('❌ Uso: *!modo performance | balanceado | silencioso*');
             return msg.reply(`✅ ${await modoFn()}`);

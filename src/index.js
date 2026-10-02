@@ -7,6 +7,7 @@ const rotasModos   = require('./routes/modos.routes');
 const rotasTV      = require('./routes/tv.routes');
 const rotasDell    = require('./routes/dell.routes');
 const rotasSistema = require('./routes/sistema.routes');
+const rotasWebhook = require('./routes/webhook.routes');
 const { iniciarBot } = require('./bot/whatsapp');
 
 const app = express();
@@ -26,6 +27,7 @@ app.use('/api',         rotasModos);   // Modos de cena (gaming, pirata, trabalh
 app.use('/api/tv',      rotasTV);      // Samsung Crystal 55" via SmartThings
 app.use('/api/dell',    rotasDell);    // Dell G15 5525 — planos de energia
 app.use('/api/sistema', rotasSistema); // Telemetria, Mídia, Bloqueio, Limpeza
+app.use('/api/webhook', rotasWebhook); // Automações do Galaxy S23 (chegar, sair, dormir)
 
 app.listen(PORT, () => {
     console.log(`[🚀] Jarvis Local rodando na porta ${PORT}`);
