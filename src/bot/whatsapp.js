@@ -17,14 +17,22 @@ const downloader = require('../services/downloader.service');
 
 let client;
 let reconectando = false;
-const DELAY_RECONEXAO_MS = 10_000;
+const CHROME_PATHS = [
+    process.env.CHROME_BIN,
+    process.env.PUPPETEER_EXECUTABLE_PATH,
+    'C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe',
+    'C:\\Program Files (x86)\\Google\\Chrome\\Application\\chrome.exe',
+];
+const getChromePath = () => CHROME_PATHS.find(p => p && fs.existsSync(p));
 
 const criarCliente = () => {
+    const chromePath = getChromePath();
     client = new Client({
         authStrategy: new LocalAuth(),
         puppeteer: {
             headless: true,
             args: ['--no-sandbox', '--disable-setuid-sandbox'],
+            ...(chromePath ? { executablePath: chromePath } : {}),
         },
     });
 
@@ -163,15 +171,34 @@ const mensagemAjuda = () => [
 ].join('\n');
 
 // ─────────────────────────────────────────────────
-//  HELPER DE RESPOSTA EM ÁUDIO
+//  HELPER DE RESPOSTA ÚNICA E ANTI-LOOP
 // ─────────────────────────────────────────────────
+
+const botMsgIds = new Set();
+
+const responder = async (msg, conteudo, opcoes) => {
+    try {
+        const resp = await msg.reply(conteudo, undefined, opcoes);
+        if (resp && resp.id && resp.id.id) {
+            botMsgIds.add(resp.id.id);
+            if (botMsgIds.size > 1000) {
+                const primeiro = botMsgIds.values().next().value;
+                botMsgIds.delete(primeiro);
+            }
+        }
+        return resp;
+    } catch (err) {
+        console.error('[❌] Erro ao enviar resposta:', err.message);
+    }
+};
 
 async function responderComVoz(msg, texto) {
     try {
         const audioPath = await tts.falar(texto);
         if (fs.existsSync(audioPath)) {
             const media = MessageMedia.fromFilePath(audioPath);
-            await msg.reply(media, undefined, { sendAudioAsVoice: true });
+            const resp = await msg.reply(media, undefined, { sendAudioAsVoice: true });
+            if (resp && resp.id && resp.id.id) botMsgIds.add(resp.id.id);
             fs.unlink(audioPath, () => {});
         }
     } catch (e) {
@@ -186,49 +213,56 @@ async function responderComVoz(msg, texto) {
 async function executarIntencao(intencao, msg, eraAudio = false) {
     if (!intencao || !intencao.comando) return;
 
-    if (intencao.resposta) {
-        await msg.reply(`🤖 ${intencao.resposta}`);
-        if (eraAudio) {
-            await responderComVoz(msg, intencao.resposta);
-        }
+    const { comando, parametro, resposta } = intencao;
+
+    // Se for áudio, responde com a nota de voz
+    if (eraAudio && resposta) {
+        await responderComVoz(msg, resposta);
     }
 
-    const { comando, parametro } = intencao;
+    // Se for intenção puramente de conversa sem comando no PC
+    if (comando === 'conversa') {
+        if (!eraAudio && resposta) {
+            return responder(msg, `🤖 ${resposta}`);
+        }
+        return;
+    }
 
+    // Executa e responde UMA ÚNICA VEZ com o resultado da ação
     switch (comando) {
-        case 'gaming':    return msg.reply(`✅ ${await service.modoGaming()}`);
-        case 'pirata':    return msg.reply(`✅ ${await service.modoPirata()}`);
-        case 'trabalho':  return msg.reply(`✅ ${await service.modoTrabalho()}`);
-        case 'espelho':   return msg.reply(`✅ ${await service.modoEspelho()}`);
-        case 'noturno':   return msg.reply(`✅ ${await service.modoNoturno()}`);
-        case 'silencio':  return msg.reply(`✅ ${await service.silencio()}`);
-        case 'spotify':   return msg.reply(`✅ ${await service.abrirSpotify()}`);
-        case 'desligar':  return msg.reply(`✅ ${await service.desligar(parametro || 30)}`);
-        case 'bloquear':  return msg.reply(`✅ ${await sistema.bloquearTela()}`);
-        case 'limpar':    return msg.reply(`✅ ${await sistema.limparSistema()}`);
-        case 'midia':     return msg.reply(`✅ ${await sistema.controlarMidia(parametro || 'playpause')}`);
+        case 'gaming':    return responder(msg, `✅ ${await service.modoGaming()}`);
+        case 'pirata':    return responder(msg, `✅ ${await service.modoPirata()}`);
+        case 'trabalho':  return responder(msg, `✅ ${await service.modoTrabalho()}`);
+        case 'espelho':   return responder(msg, `✅ ${await service.modoEspelho()}`);
+        case 'noturno':   return responder(msg, `✅ ${await service.modoNoturno()}`);
+        case 'silencio':  return responder(msg, `✅ ${await service.silencio()}`);
+        case 'spotify':   return responder(msg, `✅ ${await service.abrirSpotify()}`);
+        case 'desligar':  return responder(msg, `✅ ${await service.desligar(parametro || 30)}`);
+        case 'bloquear':  return responder(msg, `✅ ${await sistema.bloquearTela()}`);
+        case 'limpar':    return responder(msg, `✅ ${await sistema.limparSistema()}`);
+        case 'midia':     return responder(msg, `✅ ${await sistema.controlarMidia(parametro || 'playpause')}`);
         case 'pc': {
             const stats = await sistema.pcStats();
-            return msg.reply(sistema.formatarStats(stats));
+            return responder(msg, sistema.formatarStats(stats));
         }
         case 'screenshot': {
             const filePath = await sistema.screenshot();
             if (fs.existsSync(filePath)) {
                 const media = MessageMedia.fromFilePath(filePath);
-                await msg.reply(media, undefined, { caption: '🖥️ Captura de tela' });
+                await responder(msg, media, { caption: '🖥️ Captura de tela' });
                 fs.unlink(filePath, () => {});
             }
             return;
         }
         case 'volume': {
             if (parametro !== undefined) {
-                return msg.reply(`✅ ${await service.setVolume(parametro)}`);
+                return responder(msg, `✅ ${await service.setVolume(parametro)}`);
             }
             break;
         }
         case 'tv': {
             if (st.isConfigured() && TV_CMDS[parametro]) {
-                return msg.reply(`✅ ${await TV_CMDS[parametro]()}`);
+                return responder(msg, `✅ ${await TV_CMDS[parametro]()}`);
             }
             break;
         }
@@ -242,11 +276,19 @@ async function executarIntencao(intencao, msg, eraAudio = false) {
 async function handleMensagem(msg) {
     if (!msg.fromMe) return;
 
+    // 1. Ignora mensagens enviadas pelo próprio bot (anti-loop)
+    if (msg.id && botMsgIds.has(msg.id.id)) return;
+
+    // 2. Proteção de assinatura: ignora mensagens que comecem com emojis do bot
+    const textoBruto = (msg.body || '').trim();
+    if (/^(🤖|✅|❌|⏳|⚠️|🔥|📸|🧹|🎙️|🔊|🕐|• \*!|\*💻 Dell G15)/.test(textoBruto)) {
+        return;
+    }
+
     // ── 1. Tratamento de Áudios de Voz (PTT) ────────
     if (msg.hasMedia && (msg.type === 'audio' || msg.type === 'ptt')) {
         console.log('[🎙️] Mensagem de áudio recebida');
         try {
-            msg.reply('🎙️ Ouvindo e processando áudio...');
             const media = await msg.downloadMedia();
             if (media && media.data) {
                 const intencao = await ia.interpretarAudio(media.data, media.mimetype);
@@ -254,25 +296,32 @@ async function handleMensagem(msg) {
             }
         } catch (err) {
             console.error('[❌] Erro ao processar áudio:', err.message);
-            msg.reply('❌ Não consegui processar a mensagem de voz.');
         }
         return;
     }
 
-    const texto = (msg.body || '').trim();
-    if (!texto) return;
+    if (!textoBruto) return;
 
     // Rate limit
-    if (emCooldown(texto.toLowerCase().slice(0, 15))) {
+    if (emCooldown(textoBruto.toLowerCase().slice(0, 15))) {
         return;
     }
 
     // ── 2. Mensagens sem prefixo "!" (Linguagem Natural) ──
-    if (!texto.startsWith('!')) {
+    if (!textoBruto.startsWith('!')) {
+        const textoMin = textoBruto.toLowerCase();
+        // Só interpreta se mencionar explicitamente "jarvis" ou comandos diretos de cena
+        const mencionaJarvis = textoMin.includes('jarvis') || textoMin.includes('g15');
+        const acaoClara = /^(modo|jogar|gaming|pirata|cinema|trabalho|pc|status|print|screenshot|mutar|silencio|bloquear|limpar|desligar)/i.test(textoMin);
+
+        if (!mencionaJarvis && !acaoClara) {
+            return; // Deixa notas e conversas comuns do usuário intactas
+        }
+
         try {
-            const intencao = await ia.interpretarTexto(texto);
-            if (intencao && intencao.comando && intencao.comando !== 'conversa') {
-                console.log(`[🧠] Intenção detectada para "${texto}":`, intencao.comando);
+            const intencao = await ia.interpretarTexto(textoBruto);
+            if (intencao && intencao.comando) {
+                console.log(`[🧠] Intenção detectada para "${textoBruto}":`, intencao.comando);
                 await executarIntencao(intencao, msg, false);
             }
         } catch (e) {
@@ -282,124 +331,118 @@ async function handleMensagem(msg) {
     }
 
     // ── 3. Comandos com prefixo "!" ─────────────────
-    const partes  = texto.split(/\s+/);
+    const partes  = textoBruto.split(/\s+/);
     const comando = partes[0].toLowerCase();
 
-    console.log(`[💬] Comando: ${texto}`);
+    console.log(`[💬] Comando: ${textoBruto}`);
 
     try {
         // Ajuda e Utilidades
-        if (comando === '!ajuda') return msg.reply(mensagemAjuda());
-        if (comando === '!hora')  return msg.reply(`🕐 ${sistema.hora()}`);
+        if (comando === '!ajuda') return responder(msg, mensagemAjuda());
+        if (comando === '!hora')  return responder(msg, `🕐 ${sistema.hora()}`);
 
         // Voz do Jarvis sob demanda
         if (comando === '!falar') {
             const falaTexto = partes.slice(1).join(' ');
-            if (!falaTexto) return msg.reply('❌ Uso: *!falar <texto a ser dito>*');
+            if (!falaTexto) return responder(msg, '❌ Uso: *!falar <texto a ser dito>*');
             return responderComVoz(msg, falaTexto);
         }
 
         // Downloader de Vídeos e Torrents
         if (comando === '!baixar') {
             const link = partes[1];
-            if (!link) return msg.reply('❌ Uso: *!baixar <link do youtube, video ou magnet>*');
-            msg.reply('⏳ Iniciando processamento do download...');
+            if (!link) return responder(msg, '❌ Uso: *!baixar <link do youtube, video ou magnet>*');
             const res = await downloader.baixarMidia(link);
-            return msg.reply(`✅ ${res}`);
+            return responder(msg, `✅ ${res}`);
         }
 
         // Telemetria e Captura de Tela
         if (comando === '!pc') {
-            msg.reply('⏳ Coletando stats do G15...');
             const stats = await sistema.pcStats();
-            return msg.reply(sistema.formatarStats(stats));
+            return responder(msg, sistema.formatarStats(stats));
         }
 
         if (comando === '!screenshot') {
-            msg.reply('📸 Tirando print...');
             const filePath = await sistema.screenshot();
-            if (!fs.existsSync(filePath)) return msg.reply('❌ Falha ao gerar o screenshot.');
+            if (!fs.existsSync(filePath)) return responder(msg, '❌ Falha ao gerar o screenshot.');
             const media = MessageMedia.fromFilePath(filePath);
-            await msg.reply(media, undefined, { caption: '🖥️ Print da tela agora' });
+            await responder(msg, media, { caption: '🖥️ Print da tela agora' });
             fs.unlink(filePath, () => {});
             return;
         }
 
         // Bloqueio e Limpeza do PC
         if (comando === '!bloquear') {
-            return msg.reply(`✅ ${await sistema.bloquearTela()}`);
+            return responder(msg, `✅ ${await sistema.bloquearTela()}`);
         }
 
         if (comando === '!limpar') {
-            msg.reply('🧹 Executando limpeza de RAM e arquivos temporários...');
-            return msg.reply(`✅ ${await sistema.limparSistema()}`);
+            return responder(msg, `✅ ${await sistema.limparSistema()}`);
         }
 
         // Fechar Aplicativo
         if (comando === '!fechar') {
             const appAlvo = partes[1];
-            if (!appAlvo) return msg.reply('❌ Uso: *!fechar <nome_do_app>*\nEx: !fechar chrome');
-            return msg.reply(`✅ ${await sistema.fecharApp(appAlvo)}`);
+            if (!appAlvo) return responder(msg, '❌ Uso: *!fechar <nome_do_app>*\nEx: !fechar chrome');
+            return responder(msg, `✅ ${await sistema.fecharApp(appAlvo)}`);
         }
 
         // Controles de Mídia
         if (['!play', '!pause', '!playpause'].includes(comando)) {
-            return msg.reply(`✅ ${await sistema.controlarMidia('playpause')}`);
+            return responder(msg, `✅ ${await sistema.controlarMidia('playpause')}`);
         }
         if (['!proxima', '!next'].includes(comando)) {
-            return msg.reply(`✅ ${await sistema.controlarMidia('next')}`);
+            return responder(msg, `✅ ${await sistema.controlarMidia('next')}`);
         }
         if (['!anterior', '!prev'].includes(comando)) {
-            return msg.reply(`✅ ${await sistema.controlarMidia('prev')}`);
+            return responder(msg, `✅ ${await sistema.controlarMidia('prev')}`);
         }
 
         // Volume do PC
         if (comando === '!volume') {
             const nivel = parseInt(partes[1]);
             if (isNaN(nivel) || nivel < 0 || nivel > 100) {
-                return msg.reply('❌ Uso: *!volume [0-100]*\nEx: !volume 50');
+                return responder(msg, '❌ Uso: *!volume [0-100]*\nEx: !volume 50');
             }
-            msg.reply(`🔊 Ajustando volume para ${nivel}%...`);
-            return msg.reply(`✅ ${await service.setVolume(nivel)}`);
+            return responder(msg, `✅ ${await service.setVolume(nivel)}`);
         }
 
         // Samsung Crystal 55"
         if (comando === '!tv') {
             if (!st.isConfigured()) {
-                return msg.reply('❌ SmartThings não configurado.\nAdicione SMARTTHINGS_TOKEN e SMARTTHINGS_TV_DEVICE_ID no .env');
+                return responder(msg, '❌ SmartThings não configurado.\nAdicione SMARTTHINGS_TOKEN e SMARTTHINGS_TV_DEVICE_ID no .env');
             }
             const sub = partes[1]?.toLowerCase();
-            if (!sub) return msg.reply('❌ Uso: !tv ligar | desligar | volume 50 | mute | hdmi1 | netflix | youtube | prime');
+            if (!sub) return responder(msg, '❌ Uso: !tv ligar | desligar | volume 50 | mute | hdmi1 | netflix | youtube | prime');
 
             if (sub === 'volume') {
                 const nivel = parseInt(partes[2]);
-                if (isNaN(nivel) || nivel < 0 || nivel > 100) return msg.reply('❌ Uso: *!tv volume [0-100]*');
-                return msg.reply(`✅ ${await st.setVolumeTV(nivel)}`);
+                if (isNaN(nivel) || nivel < 0 || nivel > 100) return responder(msg, '❌ Uso: *!tv volume [0-100]*');
+                return responder(msg, `✅ ${await st.setVolumeTV(nivel)}`);
             }
 
             const tvFn = TV_CMDS[sub];
-            if (!tvFn) return msg.reply(`❌ Subcomando TV desconhecido: "${sub}". Digite *!ajuda*.`);
-            return msg.reply(`✅ ${await tvFn()}`);
+            if (!tvFn) return responder(msg, `❌ Subcomando TV desconhecido: "${sub}". Digite *!ajuda*.`);
+            return responder(msg, `✅ ${await tvFn()}`);
         }
 
         // Plano de Energia Dell G15
         if (comando === '!modo') {
             const sub = partes[1]?.toLowerCase();
             const modoFn = sub ? MODO_CMDS[sub] : null;
-            if (!modoFn) return msg.reply('❌ Uso: *!modo performance | balanceado | silencioso*');
-            return msg.reply(`✅ ${await modoFn()}`);
+            if (!modoFn) return responder(msg, '❌ Uso: *!modo performance | balanceado | silencioso*');
+            return responder(msg, `✅ ${await modoFn()}`);
         }
 
         // Modos de Cena Principais
         const cena = CENAS[comando];
         if (!cena) return;
 
-        msg.reply(`⏳ Executando *${comando}*...`);
-        return msg.reply(`✅ ${await cena.fn()}`);
+        return responder(msg, `✅ ${await cena.fn()}`);
 
     } catch (error) {
         console.error('[❌] Erro ao executar comando:', error.message);
-        msg.reply('❌ Falha ao executar o comando. Verifique o terminal do Jarvis.');
+        responder(msg, '❌ Falha ao executar o comando. Verifique o terminal do Jarvis.');
     }
 }
 
