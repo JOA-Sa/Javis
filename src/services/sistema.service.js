@@ -122,12 +122,35 @@ const limparSistema = async () => {
     return 'Limpeza concluída! Temporários apagados, lixeira esvaziada e cache de memória liberado.';
 };
 
+/**
+ * Ajusta o brilho da tela do Dell G15 (0 a 100%)
+ */
+const ajustarBrilho = async (nivel) => {
+    const n = Math.max(0, Math.min(100, parseInt(nivel)));
+    if (isNaN(n)) throw new Error('Nível de brilho inválido. Informe de 0 a 100.');
+    console.log(`[💡] Ajustando brilho da tela para ${n}%...`);
+    const scriptPath = path.join(__dirname, '../scripts/set_brightness.ps1');
+    await executar(`powershell -ExecutionPolicy Bypass -File "${scriptPath}" -Nivel ${n}`);
+    return `Brilho da tela ajustado para ${n}%!`;
+};
+
+/**
+ * Coloca o Windows em modo de suspensão rápida (Sleep)
+ */
+const suspenderPC = async () => {
+    console.log('[💤] Colocando o PC em suspensão...');
+    await executar('powershell -Command "Add-Type -AssemblyName System.Windows.Forms; [System.Windows.Forms.Application]::SetSuspendState([System.Windows.Forms.PowerState]::Suspend, $false, $false)"');
+    return 'Dell G15 entrando em modo de suspensão (Sleep)!';
+};
+
 module.exports = {
     screenshot,
     pcStats,
     formatarStats,
     hora,
     bloquearTela,
+    suspenderPC,
+    ajustarBrilho,
     controlarMidia,
     fecharApp,
     limparSistema,

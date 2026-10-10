@@ -59,10 +59,31 @@ const fechar = async (req, res) => {
     }
 };
 
+const brilho = async (req, res) => {
+    try {
+        const nivel = req.params.nivel;
+        const resultado = await sistema.ajustarBrilho(nivel);
+        res.json({ status: 'Sucesso', acao: resultado });
+    } catch (error) {
+        res.status(500).json({ erro: 'Falha ao ajustar brilho', detalhes: error.message });
+    }
+};
+
+const suspender = async (req, res) => {
+    try {
+        const resultado = await sistema.suspenderPC();
+        res.json({ status: 'Sucesso', acao: resultado });
+    } catch (error) {
+        res.status(500).json({ erro: 'Falha ao suspender PC', detalhes: error.message });
+    }
+};
+
 module.exports = {
     getStats,
     getScreenshot,
     bloquear,
+    suspender,
+    brilho,
     limpar,
     midia,
     fechar,

@@ -8,7 +8,9 @@ router.get('/screenshot', ctrl.getScreenshot);
 
 // Segurança e Manutenção
 router.get('/bloquear',   ctrl.bloquear);
+router.get('/suspender',  ctrl.suspender);
 router.get('/limpar',     ctrl.limpar);
+router.get('/brilho/:nivel', ctrl.brilho);
 
 // Controle de Mídia (playpause, play, pause, next, prev)
 router.get('/midia/:acao', ctrl.midia);

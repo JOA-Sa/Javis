@@ -29,6 +29,15 @@ app.use('/api/dell',    rotasDell);    // Dell G15 5525 — planos de energia
 app.use('/api/sistema', rotasSistema); // Telemetria, Mídia, Bloqueio, Limpeza
 app.use('/api/webhook', rotasWebhook); // Automações do Galaxy S23 (chegar, sair, dormir)
 
+// Proteção contra encerramento inesperado do processo
+process.on('uncaughtException', (err) => {
+    console.error('[🛡️ Uncaught Exception]', err.message || err);
+});
+
+process.on('unhandledRejection', (reason) => {
+    console.error('[🛡️ Unhandled Rejection]', reason?.message || reason);
+});
+
 app.listen(PORT, () => {
     console.log(`[🚀] Jarvis Local rodando na porta ${PORT}`);
     console.log(`[📱] Painel Web disponível em: http://localhost:${PORT}`);

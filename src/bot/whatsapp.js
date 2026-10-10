@@ -15,6 +15,7 @@ const downloader = require('../services/downloader.service');
 //  CLIENTE WHATSAPP COM AUTO-RECONEXÃO
 // ─────────────────────────────────────────────────
 
+const DELAY_RECONEXAO_MS = 5000;
 let client;
 let reconectando = false;
 const CHROME_PATHS = [
@@ -146,7 +147,9 @@ const mensagemAjuda = () => [
     '\n*💻 Dell G15 5525 & Windows:*',
     '• *!pc* — CPU, RAM, bateria, GPU NVIDIA',
     '• *!screenshot* — Recebe foto da tela agora',
+    '• *!brilho [0-100]* — Ajusta brilho do monitor',
     '• *!bloquear* — Bloqueia o Windows (Win+L)',
+    '• *!suspender* — Coloca o notebook em Sleep',
     '• *!limpar* — Limpeza de RAM e lixeira',
     '• *!fechar <app>* — Ex: !fechar chrome',
     '• *!volume [0-100]* — Volume do sistema',
@@ -176,6 +179,16 @@ const mensagemAjuda = () => [
 
 const botMsgIds = new Set();
 
+const reagir = async (msg, emoji) => {
+    try {
+        if (msg && typeof msg.react === 'function') {
+            await msg.react(emoji);
+        }
+    } catch (e) {
+        // Reação opcional se a versão do WhatsApp não suportar
+    }
+};
+
 const responder = async (msg, conteudo, opcoes) => {
     try {
         const resp = await msg.reply(conteudo, undefined, opcoes);
@@ -186,9 +199,11 @@ const responder = async (msg, conteudo, opcoes) => {
                 botMsgIds.delete(primeiro);
             }
         }
+        await reagir(msg, '✅');
         return resp;
     } catch (err) {
         console.error('[❌] Erro ao enviar resposta:', err.message);
+        await reagir(msg, '❌');
     }
 };
 
@@ -200,9 +215,10 @@ async function responderComVoz(msg, texto) {
             const resp = await msg.reply(media, undefined, { sendAudioAsVoice: true });
             if (resp && resp.id && resp.id.id) botMsgIds.add(resp.id.id);
             fs.unlink(audioPath, () => {});
+            await reagir(msg, '🎙️');
         }
     } catch (e) {
-        // Falha no áudio não impede o fluxo
+        console.warn('[⚠️] Falha ao sintetizar/enviar voz TTS:', e.message);
     }
 }
 
@@ -238,8 +254,10 @@ async function executarIntencao(intencao, msg, eraAudio = false) {
         case 'silencio':  return responder(msg, `✅ ${await service.silencio()}`);
         case 'spotify':   return responder(msg, `✅ ${await service.abrirSpotify()}`);
         case 'desligar':  return responder(msg, `✅ ${await service.desligar(parametro || 30)}`);
+        case 'suspender': return responder(msg, `✅ ${await sistema.suspenderPC()}`);
         case 'bloquear':  return responder(msg, `✅ ${await sistema.bloquearTela()}`);
         case 'limpar':    return responder(msg, `✅ ${await sistema.limparSistema()}`);
+        case 'brilho':    return responder(msg, `✅ ${await sistema.ajustarBrilho(parametro || 50)}`);
         case 'midia':     return responder(msg, `✅ ${await sistema.controlarMidia(parametro || 'playpause')}`);
         case 'pc': {
             const stats = await sistema.pcStats();
@@ -337,6 +355,13 @@ async function handleMensagem(msg) {
     console.log(`[💬] Comando: ${textoBruto}`);
 
     try {
+        // Indicador de digitação e reação de processamento
+        reagir(msg, '⏳');
+        try {
+            const chat = await msg.getChat();
+            if (chat) chat.sendStateTyping();
+        } catch (_) {}
+
         // Ajuda e Utilidades
         if (comando === '!ajuda') return responder(msg, mensagemAjuda());
         if (comando === '!hora')  return responder(msg, `🕐 ${sistema.hora()}`);
@@ -371,13 +396,26 @@ async function handleMensagem(msg) {
             return;
         }
 
-        // Bloqueio e Limpeza do PC
+        // Bloqueio, Suspensão e Limpeza do PC
         if (comando === '!bloquear') {
             return responder(msg, `✅ ${await sistema.bloquearTela()}`);
         }
 
+        if (comando === '!suspender') {
+            return responder(msg, `✅ ${await sistema.suspenderPC()}`);
+        }
+
         if (comando === '!limpar') {
             return responder(msg, `✅ ${await sistema.limparSistema()}`);
+        }
+
+        // Brilho do Notebook Dell G15
+        if (comando === '!brilho') {
+            const nivel = parseInt(partes[1]);
+            if (isNaN(nivel) || nivel < 0 || nivel > 100) {
+                return responder(msg, '❌ Uso: *!brilho [0-100]*\nEx: !brilho 80');
+            }
+            return responder(msg, `✅ ${await sistema.ajustarBrilho(nivel)}`);
         }
 
         // Fechar Aplicativo
@@ -405,6 +443,10 @@ async function handleMensagem(msg) {
                 return responder(msg, '❌ Uso: *!volume [0-100]*\nEx: !volume 50');
             }
             return responder(msg, `✅ ${await service.setVolume(nivel)}`);
+        }
+
+        if (comando === '!mutar') {
+            return responder(msg, `✅ ${await service.setVolume(0)}`);
         }
 
         // Samsung Crystal 55"

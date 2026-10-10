@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <meta name="theme-color" content="#0a0e17">
     <title>JARVIS — Command Center</title>
+    <link rel="manifest" href="/manifest.json">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link href="https://fonts.googleapis.com/css2?family=Rajdhani:wght@500;600;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
     <style>
@@ -410,6 +411,14 @@
 
         <div class="slider-group">
             <div class="slider-header">
+                <span>Brilho Monitor Dell G15</span>
+                <span id="brilhoPcLbl">80%</span>
+            </div>
+            <input type="range" id="brilhoPcSlider" min="0" max="100" value="80" onchange="ajustarBrilhoPC(this.value)">
+        </div>
+
+        <div class="slider-group">
+            <div class="slider-header">
                 <span>Volume TV Samsung Crystal</span>
                 <span id="volTvLbl">30</span>
             </div>
@@ -428,6 +437,7 @@
     <div class="action-pills">
         <div class="action-pill" onclick="abrirScreenshot()">📸 Ver Tela</div>
         <div class="action-pill" onclick="executar('/api/sistema/bloquear')">🔒 Bloquear PC</div>
+        <div class="action-pill" onclick="executar('/api/sistema/suspender')">💤 Suspender PC</div>
         <div class="action-pill" onclick="executar('/api/sistema/limpar')">🧹 Limpar RAM</div>
         <div class="action-pill" onclick="executar('/api/tv/ligar')">📺 Ligar TV</div>
         <div class="action-pill" onclick="executar('/api/tv/desligar')">💤 Desligar TV</div>
@@ -481,6 +491,11 @@
             executar(`/api/tv/volume/${val}`);
         }
 
+        function ajustarBrilhoPC(val) {
+            document.getElementById('brilhoPcLbl').innerText = val + '%';
+            executar(`/api/sistema/brilho/${val}`);
+        }
+
         async function carregarStats() {
             try {
                 const res = await fetch('/api/sistema/stats', { headers: getHeaders() });
@@ -513,6 +528,13 @@
                 showToast('Chave salva!');
                 carregarStats();
             }
+        }
+
+        // Registrar Service Worker para instalação como PWA no Galaxy S23
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', () => {
+                navigator.serviceWorker.register('/sw.js').catch(() => {});
+            });
         }
 
         // Auto-refresh stats inicial

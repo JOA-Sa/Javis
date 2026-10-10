@@ -1,6 +1,18 @@
 const https = require('https');
 
 const GEMINI_API_KEY = () => process.env.GEMINI_API_KEY;
+const GEMINI_MODEL = () => process.env.GEMINI_MODEL || 'gemini-2.0-flash';
+
+// Memória de curto prazo para manter o contexto das últimas interações
+const historicoMemoria = [];
+const LIMITE_MEMORIA = 6;
+
+const registrarMemoria = (papel, texto) => {
+    historicoMemoria.push({ papel, texto });
+    if (historicoMemoria.length > LIMITE_MEMORIA) {
+        historicoMemoria.shift();
+    }
+};
 
 /**
  * Chamada HTTPS nativa para a API do Google Gemini (sem depender de pacotes externos)
@@ -10,10 +22,11 @@ const chamarGemini = (corpoRequisicao) => {
         const key = GEMINI_API_KEY();
         if (!key) return reject(new Error('GEMINI_API_KEY não configurada'));
 
+        const modelo = GEMINI_MODEL();
         const dataStr = JSON.stringify(corpoRequisicao);
         const options = {
             hostname: 'generativelanguage.googleapis.com',
-            path: `/v1beta/models/gemini-3.8-flash:generateContent?key=${key}`,
+            path: `/v1beta/models/${modelo}:generateContent?key=${key}`,
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
@@ -30,7 +43,11 @@ const chamarGemini = (corpoRequisicao) => {
                 }
                 try {
                     const parsed = JSON.parse(buffer);
-                    const texto = parsed.candidates?.[0]?.content?.parts?.[0]?.text;
+                    let texto = parsed.candidates?.[0]?.content?.parts?.[0]?.text;
+                    if (texto) {
+                        // Remove possíveis blocos markdown ```json ... ```
+                        texto = texto.replace(/^```json\s*/i, '').replace(/\s*```$/, '').trim();
+                    }
                     resolve(texto);
                 } catch (e) {
                     reject(e);
@@ -46,14 +63,16 @@ const chamarGemini = (corpoRequisicao) => {
 
 const PROMPT_SISTEMA = `
 Você é o Jarvis, assistente pessoal do usuário no PC Dell G15 e TV Samsung Crystal 55".
-Seu objetivo é interpretar a mensagem (seja texto ou áudio transcrito) e categorizar a intenção em um comando do sistema.
+Seu objetivo é interpretar a mensagem (seja texto ou áudio) e categorizar a intenção em um comando do sistema OU responder dúvidas gerais e conversar de forma educada e prestativa como o Jarvis do Homem de Ferro.
 
 Responda ESTRITAMENTE em formato JSON (sem blocos markdown, apenas o JSON puro):
 {
-  "comando": "gaming" | "pirata" | "trabalho" | "espelho" | "noturno" | "silencio" | "screenshot" | "pc" | "volume" | "tv" | "midia" | "bloquear" | "limpar" | "desligar" | "spotify" | "conversa",
-  "parametro": string ou numero (se houver, ex: 50 para volume, "netflix" ou "ligar" ou "desligar" para tv, "playpause" ou "next" para midia),
-  "resposta": "Uma resposta curta e com personalidade do Jarvis ao usuário"
+  "comando": "gaming" | "pirata" | "trabalho" | "espelho" | "noturno" | "silencio" | "screenshot" | "pc" | "volume" | "brilho" | "suspender" | "tv" | "midia" | "bloquear" | "limpar" | "desligar" | "spotify" | "conversa",
+  "parametro": string ou numero (se houver, ex: 50 para volume ou brilho, "netflix" ou "ligar" ou "desligar" para tv, "playpause" ou "next" para midia),
+  "resposta": "Uma resposta concisa com personalidade do Jarvis ao usuário"
 }
+
+Se a mensagem for uma pergunta do dia a dia, curiosidade, código ou conversa geral, use comando="conversa" e forneça uma resposta completa e útil.
 `;
 
 /**
@@ -65,12 +84,20 @@ const interpretarTexto = async (texto) => {
     // Se tiver Gemini Key configurada, usa o modelo para máxima inteligência
     if (GEMINI_API_KEY()) {
         try {
-            const prompt = `${PROMPT_SISTEMA}\nMensagem do usuário: "${texto}"`;
+            const contextoAnterior = historicoMemoria.length > 0 
+                ? `\nHistórico recente:\n${historicoMemoria.map(m => `${m.papel}: ${m.texto}`).join('\n')}\n`
+                : '';
+
+            const prompt = `${PROMPT_SISTEMA}${contextoAnterior}\nMensagem atual do usuário: "${texto}"`;
             const respostaIA = await chamarGemini({
                 contents: [{ parts: [{ text: prompt }] }],
                 generationConfig: { responseMimeType: "application/json" }
             });
-            return JSON.parse(respostaIA);
+
+            const parsed = JSON.parse(respostaIA);
+            registrarMemoria('Usuário', texto);
+            if (parsed.resposta) registrarMemoria('Jarvis', parsed.resposta);
+            return parsed;
         } catch (e) {
             console.warn('[⚠️] Falha na IA Gemini, usando motor local de regras:', e.message);
         }
@@ -98,6 +125,9 @@ const interpretarTexto = async (texto) => {
     if (/sil[eê]ncio|mudo|mute|cala a boca/.test(textoLimpo)) {
         return { comando: 'silencio', resposta: 'Mutando todo o áudio.' };
     }
+    if (/suspender|sleep|hibernar/.test(textoLimpo)) {
+        return { comando: 'suspender', resposta: 'Colocando o Dell G15 em modo de suspensão.' };
+    }
     if (/bloquear|travar|trancar/.test(textoLimpo)) {
         return { comando: 'bloquear', resposta: 'Bloqueando o Windows para sua segurança.' };
     }
@@ -118,6 +148,11 @@ const interpretarTexto = async (texto) => {
     }
     if (/desligar tv|desliga a tv/.test(textoLimpo)) {
         return { comando: 'tv', parametro: 'desligar', resposta: 'Desligando a TV.' };
+    }
+
+    const matchBrilho = textoLimpo.match(/brilho.*?(\d+)/);
+    if (matchBrilho) {
+        return { comando: 'brilho', parametro: parseInt(matchBrilho[1]), resposta: `Ajustando brilho para ${matchBrilho[1]}%` };
     }
 
     const matchVol = textoLimpo.match(/volume.*?(\d+)/);
