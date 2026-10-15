@@ -41,8 +41,12 @@ const formatarStats = (s) => {
     linhas.push(`🧠 *RAM:* ${s.ram_usada} / ${s.ram_total} GB (${s.ram_pct}%)`);
 
     if (s.bateria !== null) {
-        const plug = s.carregando ? '🔌 Carregando' : '🔋';
-        linhas.push(`🔋 *Bateria:* ${s.bateria}% ${plug}`);
+        const estadoBateria = s.carregando
+            ? '🔌 Carregando'
+            : s.na_tomada
+                ? '🔌 Na tomada'
+                : '🔋';
+        linhas.push(`🔋 *Bateria:* ${s.bateria}% ${estadoBateria}`);
     }
 
     if (s.gpu_temp !== null) {

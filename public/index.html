@@ -449,7 +449,7 @@
     <div id="toast">Comando executado!</div>
 
     <!-- Screenshot Modal -->
-    <div id="screenshotModal" onclick="this.style.display='none'">
+    <div id="screenshotModal" onclick="fecharScreenshot()">
         <img id="screenshotImg" src="" alt="Captura de tela">
     </div>
 
@@ -511,13 +511,37 @@
             } catch (e) {}
         }
 
-        function abrirScreenshot() {
+        let screenshotObjectUrl = null;
+
+        async function abrirScreenshot() {
             showToast('📸 Capturando tela...');
             const modal = document.getElementById('screenshotModal');
             const img = document.getElementById('screenshotImg');
-            const key = localStorage.getItem('jarvis_api_key');
-            img.src = '/api/sistema/screenshot?t=' + Date.now() + (key ? '&key=' + key : '');
-            modal.style.display = 'flex';
+            try {
+                const res = await fetch('/api/sistema/screenshot?t=' + Date.now(), {
+                    headers: getHeaders(),
+                });
+                if (!res.ok) {
+                    const data = await res.json().catch(() => ({}));
+                    throw new Error(data.erro || 'Falha ao capturar a tela.');
+                }
+
+                const imagem = await res.blob();
+                if (screenshotObjectUrl) URL.revokeObjectURL(screenshotObjectUrl);
+                screenshotObjectUrl = URL.createObjectURL(imagem);
+                img.src = screenshotObjectUrl;
+                modal.style.display = 'flex';
+            } catch (error) {
+                showToast('❌ ' + error.message);
+            }
+        }
+
+        function fecharScreenshot() {
+            document.getElementById('screenshotModal').style.display = 'none';
+            if (screenshotObjectUrl) {
+                URL.revokeObjectURL(screenshotObjectUrl);
+                screenshotObjectUrl = null;
+            }
         }
 
         function configurarApiKey() {

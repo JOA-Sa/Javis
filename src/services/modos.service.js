@@ -1,4 +1,5 @@
-const { exec } = require('child_process');
+const { exec, spawn } = require('child_process');
+const fs = require('fs');
 const path = require('path');
 const st = require('./smartthings.service');
 const dell = require('./dell.service');
@@ -11,6 +12,39 @@ const executar = (comando) => {
                 return reject(error);
             }
             resolve(stdout.trim());
+        });
+    });
+};
+
+const abrirChromeKiosk = (valorUrl) => {
+    let url;
+    try {
+        url = new URL(valorUrl);
+    } catch {
+        throw new Error('PIRATA_URL deve ser um endereço HTTP ou HTTPS válido.');
+    }
+    if (!['http:', 'https:'].includes(url.protocol) || url.username || url.password) {
+        throw new Error('PIRATA_URL deve ser um endereço HTTP ou HTTPS válido.');
+    }
+
+    const candidatosChrome = [
+        process.env.CHROME_BIN,
+        process.env.PUPPETEER_EXECUTABLE_PATH,
+        'C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe',
+        'C:\\Program Files (x86)\\Google\\Chrome\\Application\\chrome.exe',
+    ];
+    const chromePath = candidatosChrome.find((caminho) => caminho && fs.existsSync(caminho)) || 'chrome.exe';
+
+    return new Promise((resolve, reject) => {
+        const processo = spawn(chromePath, ['--kiosk', url.href], {
+            detached: true,
+            stdio: 'ignore',
+            windowsHide: true,
+        });
+        processo.once('error', reject);
+        processo.once('spawn', () => {
+            processo.unref();
+            resolve();
         });
     });
 };
@@ -36,8 +70,29 @@ const PC_VOL_NOTURNO = () => parseInt(process.env.PC_VOLUME_NOTURNO ?? 20);
 // ─────────────────────────────────────────────────
 
 const setVolumePC = async (nivel) => {
+    const volume = typeof nivel === 'number'
+        ? nivel
+        : typeof nivel === 'string' && /^\d+$/.test(nivel)
+            ? Number(nivel)
+            : NaN;
+    if (!Number.isInteger(volume) || volume < 0 || volume > 100) {
+        throw new Error('Volume deve ser um número inteiro entre 0 e 100.');
+    }
     const scriptPath = path.join(__dirname, '../scripts/set_volume.ps1');
-    await executar(`powershell -ExecutionPolicy Bypass -File "${scriptPath}" -Volume ${nivel}`);
+    await executar(`powershell -ExecutionPolicy Bypass -File "${scriptPath}" -Volume ${volume}`);
+};
+
+const validarDelay = (delay) => {
+    const segundos = typeof delay === 'number'
+        ? delay
+        : typeof delay === 'string' && /^\d+$/.test(delay)
+            ? Number(delay)
+            : NaN;
+
+    if (!Number.isSafeInteger(segundos) || segundos < 0 || segundos > 86400) {
+        throw new Error('O atraso deve ser um número inteiro entre 0 e 86400 segundos.');
+    }
+    return segundos;
 };
 
 const prepararTV = async (input) => {
@@ -81,7 +136,7 @@ const modoPirata = async () => {
 
     await tentar(() => dell.modoBalanceado(), 'Plano Balanceado');
     await executar('displayswitch.exe /external');
-    await executar(`start chrome --kiosk "${url}"`);
+    await abrirChromeKiosk(url);
 
     return '🍿 Modo Pirata ON! Prepara a pipoca.';
 };
@@ -159,15 +214,17 @@ const setVolume = async (nivel) => {
 };
 
 const desligar = async (delay = 30) => {
-    console.log(`[💤] Desligando PC em ${delay} segundos...`);
-    await executar(`shutdown /s /t ${delay}`);
-    return `PC desligando em ${delay} segundos. Use !cancelar para abortar.`;
+    const segundos = validarDelay(delay);
+    console.log(`[💤] Desligando PC em ${segundos} segundos...`);
+    await executar(`shutdown /s /t ${segundos}`);
+    return `PC desligando em ${segundos} segundos. Use !cancelar para abortar.`;
 };
 
 const reiniciar = async (delay = 30) => {
-    console.log(`[🔄] Reiniciando PC em ${delay} segundos...`);
-    await executar(`shutdown /r /t ${delay}`);
-    return `PC reiniciando em ${delay} segundos. Use !cancelar para abortar.`;
+    const segundos = validarDelay(delay);
+    console.log(`[🔄] Reiniciando PC em ${segundos} segundos...`);
+    await executar(`shutdown /r /t ${segundos}`);
+    return `PC reiniciando em ${segundos} segundos. Use !cancelar para abortar.`;
 };
 
 const cancelarDesligamento = async () => {

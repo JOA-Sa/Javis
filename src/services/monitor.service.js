@@ -26,7 +26,7 @@ const iniciarMonitor = (client) => {
             const meJid = client.info.wid._serialized;
 
             // 1. Alerta de Bateria Crítica (< 20% fora da tomada)
-            if (stats.bateria !== null && !stats.carregando && stats.bateria <= 20) {
+            if (stats.bateria !== null && !stats.na_tomada && stats.bateria <= 20) {
                 if (agora - ultimoAlertaBateria > COOLDOWN_BATERIA_MS) {
                     ultimoAlertaBateria = agora;
                     const msg = `⚠️ *Aviso do Jarvis:* A bateria do seu Dell G15 atingiu *${stats.bateria}%* e o carregador está desconectado. Conecte-o à tomada para evitar desligamento.`;

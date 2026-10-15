@@ -1,15 +1,15 @@
 /**
  * Middleware de autenticação por API Key.
- * Configure a variável API_KEY no .env para ativar a proteção.
- * Se API_KEY não estiver definida, a API fica aberta (útil em dev).
+ * A API só responde quando uma API_KEY estiver configurada e for enviada no header.
  */
 const autenticar = (req, res, next) => {
-    const apiKey = process.env.API_KEY;
+    const apiKey = process.env.API_KEY?.trim();
 
-    // Se nenhuma chave foi configurada, libera o acesso (modo dev)
-    if (!apiKey) return next();
+    if (!apiKey) {
+        return res.status(503).json({ erro: 'API_KEY não configurada no servidor.' });
+    }
 
-    const chaveEnviada = req.headers['x-api-key'] || req.query.key;
+    const chaveEnviada = req.headers['x-api-key'];
 
     if (chaveEnviada !== apiKey) {
         return res.status(401).json({ erro: 'Não autorizado. Chave de API inválida.' });

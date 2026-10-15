@@ -16,8 +16,10 @@ const downloader = require('../services/downloader.service');
 // ─────────────────────────────────────────────────
 
 const DELAY_RECONEXAO_MS = 5000;
+const TIMEOUT_CONEXAO_MS = 60_000;
 let client;
-let reconectando = false;
+let timerReconexao = null;
+let timerConexao = null;
 const CHROME_PATHS = [
     process.env.CHROME_BIN,
     process.env.PUPPETEER_EXECUTABLE_PATH,
@@ -28,7 +30,7 @@ const getChromePath = () => CHROME_PATHS.find(p => p && fs.existsSync(p));
 
 const criarCliente = () => {
     const chromePath = getChromePath();
-    client = new Client({
+    const clientAtual = new Client({
         authStrategy: new LocalAuth(),
         puppeteer: {
             headless: true,
@@ -36,43 +38,94 @@ const criarCliente = () => {
             ...(chromePath ? { executablePath: chromePath } : {}),
         },
     });
+    client = clientAtual;
 
-    client.on('qr', (qr) => {
+    clientAtual.on('qr', (qr) => {
+        if (clientAtual !== client) return;
+        if (timerConexao) clearTimeout(timerConexao);
+        timerConexao = null;
         console.log('[📱] Escaneie o QR Code abaixo com seu WhatsApp:');
         qrcode.generate(qr, { small: true });
     });
 
-    client.on('ready', () => {
-        reconectando = false;
+    clientAtual.on('ready', () => {
+        if (clientAtual !== client) return;
+        if (timerConexao) clearTimeout(timerConexao);
+        if (timerReconexao) clearTimeout(timerReconexao);
+        timerConexao = null;
+        timerReconexao = null;
         console.log('[📱] Bot Jarvis conectado! Pronto para comandos de texto, áudio e voz.');
         console.log('[📋] Digite !ajuda no WhatsApp para ver os comandos.\n');
 
         // Inicia o monitoramento proativo de bateria e temperatura do Dell G15
-        monitor.iniciarMonitor(client);
+        monitor.iniciarMonitor(clientAtual);
     });
 
-    client.on('disconnected', (reason) => {
+    clientAtual.on('disconnected', (reason) => {
+        if (clientAtual !== client) return;
         console.log(`[⚠️] Bot desconectado: ${reason}`);
         monitor.pararMonitor();
-        if (!reconectando) tentarReconectar();
+        tentarReconectar(clientAtual);
     });
 
-    client.on('auth_failure', (msg) => {
+    clientAtual.on('auth_failure', (msg) => {
+        if (clientAtual !== client) return;
         console.error('[❌] Falha de autenticação:', msg);
-        if (!reconectando) tentarReconectar();
+        tentarReconectar(clientAtual);
     });
 
-    client.on('message_create', handleMensagem);
+    clientAtual.on('message_create', (msg) => {
+        if (clientAtual === client) handleMensagem(msg);
+    });
 
-    client.initialize();
-    return client;
+    timerConexao = setTimeout(() => {
+        if (clientAtual !== client) return;
+        console.warn('[⚠️] O cliente WhatsApp não ficou pronto dentro do prazo.');
+        tentarReconectar(clientAtual);
+    }, TIMEOUT_CONEXAO_MS);
+
+    Promise.resolve()
+        .then(() => clientAtual.initialize())
+        .catch((error) => {
+            if (clientAtual !== client) return;
+            console.error('[❌] Falha ao inicializar o cliente WhatsApp:', error.message);
+            tentarReconectar(clientAtual);
+        });
+
+    return clientAtual;
 };
 
-const tentarReconectar = () => {
-    if (reconectando) return;
-    reconectando = true;
+const tentarReconectar = (clientComFalha = client) => {
+    if (timerReconexao) return;
+    if (timerConexao) clearTimeout(timerConexao);
+    timerConexao = null;
+    monitor.pararMonitor();
     console.log(`[🔄] Tentando reconectar em ${DELAY_RECONEXAO_MS / 1000}s...`);
-    setTimeout(() => {
+
+    timerReconexao = setTimeout(async () => {
+        timerReconexao = null;
+        if (clientComFalha !== client) return;
+
+        client = null;
+        if (clientComFalha && typeof clientComFalha.destroy === 'function') {
+            let timerDestruicao;
+            const destruicao = Promise.resolve()
+                .then(() => clientComFalha.destroy())
+                .then(() => true)
+                .catch((error) => {
+                    console.warn('[⚠️] Não foi possível encerrar o cliente anterior:', error.message);
+                    return true;
+                });
+            const limiteDestruicao = new Promise((resolve) => {
+                timerDestruicao = setTimeout(() => resolve(false), 10_000);
+            });
+            const destruido = await Promise.race([destruicao, limiteDestruicao]);
+            clearTimeout(timerDestruicao);
+            if (!destruido) {
+                console.warn('[⚠️] O cliente anterior demorou para encerrar; continuando a reconexão.');
+            }
+        }
+
         console.log('[🔄] Reinicializando cliente WhatsApp...');
         criarCliente();
     }, DELAY_RECONEXAO_MS);
@@ -253,12 +306,27 @@ async function executarIntencao(intencao, msg, eraAudio = false) {
         case 'noturno':   return responder(msg, `✅ ${await service.modoNoturno()}`);
         case 'silencio':  return responder(msg, `✅ ${await service.silencio()}`);
         case 'spotify':   return responder(msg, `✅ ${await service.abrirSpotify()}`);
-        case 'desligar':  return responder(msg, `✅ ${await service.desligar(parametro || 30)}`);
+        case 'desligar': {
+            if (!Number.isSafeInteger(parametro) || parametro < 0 || parametro > 86400) {
+                return responder(msg, '❌ Não consegui validar o tempo para desligar o PC.');
+            }
+            return responder(msg, `✅ ${await service.desligar(parametro)}`);
+        }
         case 'suspender': return responder(msg, `✅ ${await sistema.suspenderPC()}`);
         case 'bloquear':  return responder(msg, `✅ ${await sistema.bloquearTela()}`);
         case 'limpar':    return responder(msg, `✅ ${await sistema.limparSistema()}`);
-        case 'brilho':    return responder(msg, `✅ ${await sistema.ajustarBrilho(parametro || 50)}`);
-        case 'midia':     return responder(msg, `✅ ${await sistema.controlarMidia(parametro || 'playpause')}`);
+        case 'brilho': {
+            if (!Number.isInteger(parametro) || parametro < 0 || parametro > 100) {
+                return responder(msg, '❌ Não consegui validar o brilho. Informe um valor entre 0 e 100.');
+            }
+            return responder(msg, `✅ ${await sistema.ajustarBrilho(parametro)}`);
+        }
+        case 'midia': {
+            if (!['playpause', 'play', 'pause', 'next', 'prev', 'stop'].includes(parametro)) {
+                return responder(msg, '❌ Não consegui validar o comando de mídia.');
+            }
+            return responder(msg, `✅ ${await sistema.controlarMidia(parametro)}`);
+        }
         case 'pc': {
             const stats = await sistema.pcStats();
             return responder(msg, sistema.formatarStats(stats));
@@ -273,16 +341,21 @@ async function executarIntencao(intencao, msg, eraAudio = false) {
             return;
         }
         case 'volume': {
-            if (parametro !== undefined) {
-                return responder(msg, `✅ ${await service.setVolume(parametro)}`);
+            if (!Number.isInteger(parametro) || parametro < 0 || parametro > 100) {
+                return responder(msg, '❌ Não consegui validar o volume. Informe um valor entre 0 e 100.');
             }
-            break;
+            return responder(msg, `✅ ${await service.setVolume(parametro)}`);
         }
         case 'tv': {
-            if (st.isConfigured() && TV_CMDS[parametro]) {
+            const acaoTVValida = typeof parametro === 'string'
+                && Object.prototype.hasOwnProperty.call(TV_CMDS, parametro);
+            if (!st.isConfigured()) {
+                return responder(msg, '❌ SmartThings não configurado.');
+            }
+            if (acaoTVValida) {
                 return responder(msg, `✅ ${await TV_CMDS[parametro]()}`);
             }
-            break;
+            return responder(msg, '❌ Não consegui validar a ação solicitada para a TV.');
         }
     }
 }
@@ -427,7 +500,8 @@ async function handleMensagem(msg) {
 
         // Controles de Mídia
         if (['!play', '!pause', '!playpause'].includes(comando)) {
-            return responder(msg, `✅ ${await sistema.controlarMidia('playpause')}`);
+            const acaoMidia = comando === '!playpause' ? 'playpause' : comando.slice(1);
+            return responder(msg, `✅ ${await sistema.controlarMidia(acaoMidia)}`);
         }
         if (['!proxima', '!next'].includes(comando)) {
             return responder(msg, `✅ ${await sistema.controlarMidia('next')}`);
@@ -463,7 +537,9 @@ async function handleMensagem(msg) {
                 return responder(msg, `✅ ${await st.setVolumeTV(nivel)}`);
             }
 
-            const tvFn = TV_CMDS[sub];
+            const tvFn = sub && Object.prototype.hasOwnProperty.call(TV_CMDS, sub)
+                ? TV_CMDS[sub]
+                : null;
             if (!tvFn) return responder(msg, `❌ Subcomando TV desconhecido: "${sub}". Digite *!ajuda*.`);
             return responder(msg, `✅ ${await tvFn()}`);
         }
@@ -471,13 +547,15 @@ async function handleMensagem(msg) {
         // Plano de Energia Dell G15
         if (comando === '!modo') {
             const sub = partes[1]?.toLowerCase();
-            const modoFn = sub ? MODO_CMDS[sub] : null;
+            const modoFn = sub && Object.prototype.hasOwnProperty.call(MODO_CMDS, sub)
+                ? MODO_CMDS[sub]
+                : null;
             if (!modoFn) return responder(msg, '❌ Uso: *!modo performance | balanceado | silencioso*');
             return responder(msg, `✅ ${await modoFn()}`);
         }
 
         // Modos de Cena Principais
-        const cena = CENAS[comando];
+        const cena = Object.prototype.hasOwnProperty.call(CENAS, comando) ? CENAS[comando] : null;
         if (!cena) return;
 
         return responder(msg, `✅ ${await cena.fn()}`);

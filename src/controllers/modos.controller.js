@@ -1,5 +1,13 @@
 const service = require('../services/modos.service');
 
+const lerDelay = (valor) => {
+    if (valor === undefined) return 30;
+    if (typeof valor !== 'string' || !/^\d+$/.test(valor)) return null;
+
+    const delay = Number(valor);
+    return Number.isSafeInteger(delay) && delay >= 0 && delay <= 86400 ? delay : null;
+};
+
 /**
  * Wrapper genérico para transformar funções do serviço em handlers do Express.
  */
@@ -34,7 +42,10 @@ const setVolume = async (req, res) => {
 };
 
 const desligar = async (req, res) => {
-    const delay = parseInt(req.query.delay) || 30;
+    const delay = lerDelay(req.query.delay);
+    if (delay === null) {
+        return res.status(400).json({ erro: 'O atraso deve ser um número inteiro entre 0 e 86400 segundos.' });
+    }
     try {
         const resultado = await service.desligar(delay);
         res.json({ status: 'Sucesso', acao: resultado });
@@ -44,7 +55,10 @@ const desligar = async (req, res) => {
 };
 
 const reiniciar = async (req, res) => {
-    const delay = parseInt(req.query.delay) || 30;
+    const delay = lerDelay(req.query.delay);
+    if (delay === null) {
+        return res.status(400).json({ erro: 'O atraso deve ser um número inteiro entre 0 e 86400 segundos.' });
+    }
     try {
         const resultado = await service.reiniciar(delay);
         res.json({ status: 'Sucesso', acao: resultado });

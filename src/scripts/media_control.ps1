@@ -8,29 +8,48 @@ Add-Type -TypeDefinition @"
 using System;
 using System.Runtime.InteropServices;
 
-public class MediaKeys {
-    [DllImport("user32.dll")]
-    public static extern void keybd_event(byte bVk, byte bScan, uint dwFlags, int dwExtraInfo);
+public static class MediaCommands {
+    private const uint WM_APPCOMMAND = 0x0319;
+    private const uint SMTO_ABORTIFHUNG = 0x0002;
 
-    public const byte VK_MEDIA_NEXT_TRACK = 0xB0;
-    public const byte VK_MEDIA_PREV_TRACK = 0xB1;
-    public const byte VK_MEDIA_STOP       = 0xB2;
-    public const byte VK_MEDIA_PLAY_PAUSE = 0xB3;
+    [DllImport("user32.dll", SetLastError = true)]
+    private static extern IntPtr SendMessageTimeout(
+        IntPtr hWnd,
+        uint Msg,
+        IntPtr wParam,
+        IntPtr lParam,
+        uint fuFlags,
+        uint uTimeout,
+        out IntPtr lpdwResult);
 
-    public const uint KEYEVENTF_KEYUP = 0x0002;
-
-    public static void SendKey(byte vk) {
-        keybd_event(vk, 0, 0, 0);
-        keybd_event(vk, 0, KEYEVENTF_KEYUP, 0);
+    public static bool Send(int appCommand) {
+        IntPtr result;
+        IntPtr lParam = new IntPtr((long)appCommand << 16);
+        IntPtr sent = SendMessageTimeout(
+            new IntPtr(0xffff),
+            WM_APPCOMMAND,
+            IntPtr.Zero,
+            lParam,
+            SMTO_ABORTIFHUNG,
+            2000,
+            out result);
+        return sent != IntPtr.Zero;
     }
 }
 "@
 
-switch ($Acao.ToLower()) {
-    "playpause" { [MediaKeys]::SendKey([MediaKeys]::VK_MEDIA_PLAY_PAUSE); Write-Output "Play/Pause enviado" }
-    "play"      { [MediaKeys]::SendKey([MediaKeys]::VK_MEDIA_PLAY_PAUSE); Write-Output "Play/Pause enviado" }
-    "pause"     { [MediaKeys]::SendKey([MediaKeys]::VK_MEDIA_PLAY_PAUSE); Write-Output "Play/Pause enviado" }
-    "next"      { [MediaKeys]::SendKey([MediaKeys]::VK_MEDIA_NEXT_TRACK); Write-Output "Próxima faixa" }
-    "prev"      { [MediaKeys]::SendKey([MediaKeys]::VK_MEDIA_PREV_TRACK); Write-Output "Faixa anterior" }
-    "stop"      { [MediaKeys]::SendKey([MediaKeys]::VK_MEDIA_STOP); Write-Output "Mídia parada" }
+$comandos = @{
+    "playpause" = @{ Codigo = 14; Mensagem = "Play/Pause enviado" }
+    "play"      = @{ Codigo = 46; Mensagem = "Comando de reprodução enviado" }
+    "pause"     = @{ Codigo = 47; Mensagem = "Comando de pausa enviado" }
+    "next"      = @{ Codigo = 11; Mensagem = "Próxima faixa" }
+    "prev"      = @{ Codigo = 12; Mensagem = "Faixa anterior" }
+    "stop"      = @{ Codigo = 13; Mensagem = "Mídia parada" }
 }
+
+$comando = $comandos[$Acao.ToLower()]
+if (-not [MediaCommands]::Send($comando.Codigo)) {
+    throw "O Windows não confirmou o envio do comando de mídia '$Acao'."
+}
+
+Write-Output $comando.Mensagem

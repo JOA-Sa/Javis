@@ -10,11 +10,16 @@ const getStats = async (req, res) => {
     }
 };
 
-const getScreenshot = async (req, res) => {
+const getScreenshot = async (req, res, next) => {
     try {
         const caminhoImg = await sistema.screenshot();
-        res.sendFile(caminhoImg, () => {
+        res.sendFile(caminhoImg, (error) => {
             fs.unlink(caminhoImg, () => {}); // Remove após envio
+            if (!error) return;
+
+            console.error('[❌] Erro ao enviar screenshot:', error.message);
+            if (res.headersSent) return next(error);
+            return res.status(500).json({ erro: 'Falha ao enviar a captura de tela.' });
         });
     } catch (error) {
         res.status(500).json({ erro: 'Falha ao capturar tela', detalhes: error.message });

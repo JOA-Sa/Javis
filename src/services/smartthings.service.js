@@ -106,7 +106,8 @@ const TV_APPS = {
 };
 
 const abrirAppTV = async (appKey) => {
-    const appId = TV_APPS[appKey.toLowerCase()];
+    const chave = typeof appKey === 'string' ? appKey.toLowerCase() : '';
+    const appId = Object.prototype.hasOwnProperty.call(TV_APPS, chave) ? TV_APPS[chave] : null;
     if (!appId) {
         throw new Error(`App "${appKey}" não reconhecido. Disponíveis: ${Object.keys(TV_APPS).join(', ')}`);
     }

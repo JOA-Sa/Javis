@@ -1,7 +1,24 @@
 const https = require('https');
 
 const GEMINI_API_KEY = () => process.env.GEMINI_API_KEY;
-const GEMINI_MODEL = () => process.env.GEMINI_MODEL || 'gemini-2.0-flash';
+const GEMINI_MODEL = () => {
+    const configurado = process.env.GEMINI_MODEL?.trim();
+    if (!configurado || /^gemini-2\.0-flash(?:-001)?$/.test(configurado)) {
+        return 'gemini-3.8-flash';
+    }
+    return configurado;
+};
+
+const COMANDOS_PERMITIDOS = new Set([
+    'gaming', 'pirata', 'trabalho', 'espelho', 'noturno', 'silencio',
+    'screenshot', 'pc', 'volume', 'brilho', 'suspender', 'tv', 'midia',
+    'bloquear', 'limpar', 'desligar', 'spotify', 'conversa',
+]);
+const MIDIA_PERMITIDA = new Set(['playpause', 'play', 'pause', 'next', 'prev', 'stop']);
+const TV_PERMITIDA = new Set([
+    'ligar', 'desligar', 'mute', 'unmute', 'hdmi1', 'hdmi2', 'hdmi3',
+    'netflix', 'youtube', 'prime', 'disney', 'spotify',
+]);
 
 // Memória de curto prazo para manter o contexto das últimas interações
 const historicoMemoria = [];
@@ -12,6 +29,70 @@ const registrarMemoria = (papel, texto) => {
     if (historicoMemoria.length > LIMITE_MEMORIA) {
         historicoMemoria.shift();
     }
+};
+
+const lerInteiroSeguro = (valor, minimo, maximo) => {
+    const numero = typeof valor === 'number'
+        ? valor
+        : typeof valor === 'string' && /^\d+$/.test(valor.trim())
+            ? Number(valor)
+            : NaN;
+
+    return Number.isSafeInteger(numero) && numero >= minimo && numero <= maximo
+        ? numero
+        : null;
+};
+
+/** Valida a saída do modelo antes que qualquer intenção possa acionar o sistema. */
+const sanitizarIntencao = (dados) => {
+    const resposta = typeof dados?.resposta === 'string'
+        ? dados.resposta.trim().slice(0, 1000)
+        : '';
+    const conversaSegura = (mensagem = resposta) => ({
+        comando: 'conversa',
+        resposta: mensagem || 'Não consegui interpretar a solicitação com segurança.',
+    });
+
+    if (!dados || typeof dados !== 'object' || Array.isArray(dados)) {
+        return conversaSegura();
+    }
+
+    const comando = typeof dados.comando === 'string'
+        ? dados.comando.trim().toLowerCase()
+        : '';
+    if (!COMANDOS_PERMITIDOS.has(comando)) return conversaSegura();
+    if (comando === 'conversa') return conversaSegura();
+
+    let parametro;
+    if (comando === 'volume' || comando === 'brilho') {
+        parametro = lerInteiroSeguro(dados.parametro, 0, 100);
+        if (parametro === null) {
+            return conversaSegura('Não consegui validar o nível solicitado. Informe um valor entre 0 e 100.');
+        }
+    } else if (comando === 'desligar') {
+        parametro = dados.parametro === undefined || dados.parametro === null
+            ? 30
+            : lerInteiroSeguro(dados.parametro, 0, 86400);
+        if (parametro === null) {
+            return conversaSegura('Não consegui validar o tempo para desligar o PC.');
+        }
+    } else if (comando === 'midia') {
+        parametro = typeof dados.parametro === 'string' ? dados.parametro.toLowerCase() : '';
+        if (!MIDIA_PERMITIDA.has(parametro)) {
+            return conversaSegura('Não consegui validar o comando de mídia solicitado.');
+        }
+    } else if (comando === 'tv') {
+        parametro = typeof dados.parametro === 'string' ? dados.parametro.toLowerCase() : '';
+        if (!TV_PERMITIDA.has(parametro)) {
+            return conversaSegura('Não consegui validar a ação solicitada para a TV.');
+        }
+    }
+
+    return {
+        comando,
+        ...(parametro !== undefined ? { parametro } : {}),
+        resposta: resposta || 'Executando a ação solicitada.',
+    };
 };
 
 /**
@@ -94,7 +175,7 @@ const interpretarTexto = async (texto) => {
                 generationConfig: { responseMimeType: "application/json" }
             });
 
-            const parsed = JSON.parse(respostaIA);
+            const parsed = sanitizarIntencao(JSON.parse(respostaIA));
             registrarMemoria('Usuário', texto);
             if (parsed.resposta) registrarMemoria('Jarvis', parsed.resposta);
             return parsed;
@@ -131,11 +212,15 @@ const interpretarTexto = async (texto) => {
     if (/bloquear|travar|trancar/.test(textoLimpo)) {
         return { comando: 'bloquear', resposta: 'Bloqueando o Windows para sua segurança.' };
     }
-    if (/limpar|limpeza|otimizar|ram/.test(textoLimpo)) {
+    // Exige palavras completas para evitar que "programa" seja confundido com "ram".
+    if (/(^|[^a-z0-9áàâãéêíóôõúüç])(?:limpar|limpeza|otimizar|mem[oó]ria|ram)(?=$|[^a-z0-9áàâãéêíóôõúüç])/i.test(textoLimpo)) {
         return { comando: 'limpar', resposta: 'Executando otimização de memória.' };
     }
-    if (/pausar|pause|despausar|play|tocar/.test(textoLimpo)) {
-        return { comando: 'midia', parametro: 'playpause', resposta: 'Alternando reprodução de mídia.' };
+    if (/(^|[^a-z0-9áàâãéêíóôõúüç])(?:despausar|play|tocar|reproduzir|retomar|continuar)(?=$|[^a-z0-9áàâãéêíóôõúüç])/i.test(textoLimpo)) {
+        return { comando: 'midia', parametro: 'play', resposta: 'Retomando a reprodução de mídia.' };
+    }
+    if (/(^|[^a-z0-9áàâãéêíóôõúüç])(?:pausar|pause|pausa)(?=$|[^a-z0-9áàâãéêíóôõúüç])/i.test(textoLimpo)) {
+        return { comando: 'midia', parametro: 'pause', resposta: 'Pausando a reprodução de mídia.' };
     }
     if (/pr[oó]xim[ao]|passar m[uú]sica|avan[cç]ar/.test(textoLimpo)) {
         return { comando: 'midia', parametro: 'next', resposta: 'Avançando faixa.' };
@@ -193,7 +278,7 @@ const interpretarAudio = async (base64Audio, mimetype) => {
         };
 
         const respostaJson = await chamarGemini(corpo);
-        return JSON.parse(respostaJson);
+        return sanitizarIntencao(JSON.parse(respostaJson));
     } catch (err) {
         console.error('[❌] Erro ao processar áudio com Gemini:', err.message);
         return {
