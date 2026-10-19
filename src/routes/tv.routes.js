@@ -20,4 +20,8 @@ router.get('/input/:input',    tv.setInputTV);
 // Apps de streaming  (ex: /api/tv/app/netflix)
 router.get('/app/:app',        tv.abrirAppTV);
 
+// Teclas remotas virtuais (cima, baixo, esquerda, direita, ok, voltar, home)
+router.get('/tecla/:tecla',    tv.enviarTeclaTV);
+
+
 module.exports = router;

@@ -25,8 +25,11 @@ const modoGaming    = handler(service.modoGaming);
 const modoPirata    = handler(service.modoPirata);
 const modoTrabalho  = handler(service.modoTrabalho);
 const modoEspelho   = handler(service.modoEspelho);
+const modoNoturno   = handler(service.modoNoturno);
+const silencio      = handler(service.silencio);
 const abrirSpotify  = handler(service.abrirSpotify);
 const cancelarDesligamento = handler(service.cancelarDesligamento);
+
 
 const setVolume = async (req, res) => {
     const nivel = parseInt(req.params.nivel);
@@ -72,9 +75,12 @@ module.exports = {
     modoPirata,
     modoTrabalho,
     modoEspelho,
+    modoNoturno,
+    silencio,
     setVolume,
     desligar,
     reiniciar,
     cancelarDesligamento,
     abrirSpotify,
 };
+

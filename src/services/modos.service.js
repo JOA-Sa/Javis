@@ -3,6 +3,8 @@ const fs = require('fs');
 const path = require('path');
 const st = require('./smartthings.service');
 const dell = require('./dell.service');
+const sistema = require('./sistema.service');
+
 
 const executar = (comando) => {
     return new Promise((resolve, reject) => {
@@ -118,10 +120,12 @@ const modoGaming = async () => {
     }
 
     await tentar(() => dell.modoPerformance(), 'Plano Performance');
+    await tentar(() => sistema.definirDispositivoAudio('Samsung'), 'Comutar som para TV');
+    await tentar(() => sistema.controleFoco('ativar'), 'Ativar Foco (Não Perturbe)');
     await executar('displayswitch.exe /external');
     await executar('start steam://open/bigpicture');
 
-    return `🎮 Gaming Mode ON! TV no HDMI (vol ${TV_VOL_GAMING()}), G15 em performance máxima, Steam na tela grande.`;
+    return `🎮 Gaming Mode ON! TV no HDMI (vol ${TV_VOL_GAMING()}), som na TV, notificações silenciadas, G15 em performance máxima.`;
 };
 
 const modoPirata = async () => {
@@ -135,10 +139,12 @@ const modoPirata = async () => {
     }
 
     await tentar(() => dell.modoBalanceado(), 'Plano Balanceado');
+    await tentar(() => sistema.definirDispositivoAudio('Samsung'), 'Comutar som para TV');
+    await tentar(() => sistema.controleFoco('ativar'), 'Ativar Foco (Não Perturbe)');
     await executar('displayswitch.exe /external');
     await abrirChromeKiosk(url);
 
-    return '🍿 Modo Pirata ON! Prepara a pipoca.';
+    return '🍿 Modo Pirata ON! Prepara a pipoca, som na TV e notificações em silêncio.';
 };
 
 const modoTrabalho = async () => {
@@ -149,10 +155,13 @@ const modoTrabalho = async () => {
     }
 
     await tentar(() => dell.modoBalanceado(), 'Plano Balanceado');
+    await tentar(() => sistema.definirDispositivoAudio('Realtek'), 'Comutar som para Alto-falantes/Fones');
+    await tentar(() => sistema.controleFoco('desativar'), 'Desativar Foco (Notificações normais)');
     await executar('displayswitch.exe /internal');
 
-    return '💻 Modo Trabalho ON! TV desligada, G15 equilibrado, foco total.';
+    return '💻 Modo Trabalho ON! TV desligada, som no notebook, notificações reativadas, foco total.';
 };
+
 
 const modoEspelho = async () => {
     console.log('[🖥️] Acionando Modo Espelho...');

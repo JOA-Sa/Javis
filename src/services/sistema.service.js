@@ -138,6 +138,7 @@ const ajustarBrilho = async (nivel) => {
     return `Brilho da tela ajustado para ${n}%!`;
 };
 
+
 /**
  * Coloca o Windows em modo de suspensão rápida (Sleep)
  */
@@ -145,6 +146,122 @@ const suspenderPC = async () => {
     console.log('[💤] Colocando o PC em suspensão...');
     await executar('powershell -Command "Add-Type -AssemblyName System.Windows.Forms; [System.Windows.Forms.Application]::SetSuspendState([System.Windows.Forms.PowerState]::Suspend, $false, $false)"');
     return 'Dell G15 entrando em modo de suspensão (Sleep)!';
+};
+
+/**
+ * Lista os dispositivos de saída de áudio ativos no Windows
+ */
+const listarDispositivosAudio = async () => {
+    const scriptPath = path.join(__dirname, '../scripts/audio_control.ps1');
+    const jsonStr = await executar(`powershell -ExecutionPolicy Bypass -File "${scriptPath}" -Acao listar`);
+    const parsed = JSON.parse(jsonStr);
+    return Array.isArray(parsed) ? parsed : [parsed];
+};
+
+/**
+ * Define o dispositivo de saída de áudio padrão por correspondência de nome
+ */
+const definirDispositivoAudio = async (nome) => {
+    const scriptPath = path.join(__dirname, '../scripts/audio_control.ps1');
+    const saida = await executar(`powershell -ExecutionPolicy Bypass -File "${scriptPath}" -Acao definir -Nome "${nome}"`);
+    return saida || `Dispositivo de áudio comutado para "${nome}"`;
+};
+
+/**
+ * Ativa ou desativa o Modo Não Perturbe (Focus Assist) do Windows
+ */
+const controleFoco = async (acao = 'status') => {
+    const scriptPath = path.join(__dirname, '../scripts/focus_assist.ps1');
+    const saida = await executar(`powershell -ExecutionPolicy Bypass -File "${scriptPath}" -Acao "${acao}"`);
+    try { return JSON.parse(saida); }
+    catch { return saida; }
+};
+
+/**
+ * Lista os principais processos em execução no Windows consumindo memória
+ */
+const listarProcessos = async () => {
+    const scriptPath = path.join(__dirname, '../scripts/process_manager.ps1');
+    const jsonStr = await executar(`powershell -ExecutionPolicy Bypass -File "${scriptPath}" -Acao listar`);
+    return JSON.parse(jsonStr);
+};
+
+/**
+ * Encerra um processo com segurança através de seu PID
+ */
+const matarProcesso = async (pid) => {
+    const id = parseInt(pid);
+    if (isNaN(id) || id <= 4) throw new Error('PID inválido ou processo protegido.');
+    const scriptPath = path.join(__dirname, '../scripts/process_manager.ps1');
+    return await executar(`powershell -ExecutionPolicy Bypass -File "${scriptPath}" -Acao matar -ProcessoId ${id}`);
+};
+
+/**
+ * Obtém previsão do tempo atual via wttr.in
+ */
+const obterPrevisaoTempo = (cidade = 'Sao_Paulo') => {
+    const https = require('https');
+    return new Promise((resolve) => {
+        const cidadeFormatada = encodeURIComponent(cidade.trim().replace(/\s+/g, '_'));
+        const url = `https://wttr.in/${cidadeFormatada}?format=%C+%t+%w+%h`;
+        const req = https.get(url, { headers: { 'User-Agent': 'curl/7.68.0' }, timeout: 6000 }, (res) => {
+            let buffer = '';
+            res.on('data', c => buffer += c);
+            res.on('end', () => {
+                if (res.statusCode === 200 && buffer.trim()) {
+                    resolve(buffer.trim());
+                } else {
+                    resolve('Previsão indisponível no momento');
+                }
+            });
+        });
+        req.on('error', () => resolve('Previsão indisponível'));
+        req.on('timeout', () => { req.destroy(); resolve('Previsão indisponível (timeout)'); });
+    });
+};
+
+/**
+ * Gera um resumo matinal executivo (Briefing do Jarvis)
+ */
+const gerarBriefingMatinal = async (cidade = 'Sao_Paulo') => {
+    const [stats, tempo] = await Promise.all([
+        pcStats().catch(() => null),
+        obterPrevisaoTempo(cidade).catch(() => 'Indisponível'),
+    ]);
+
+    const linhas = ['*☀️ Bom dia, senhor! Jarvis ao seu dispor.*\n'];
+    linhas.push(`📅 *Data:* ${hora()}`);
+    linhas.push(`🌤️ *Clima (${cidade.replace(/_/g, ' ')}):* ${tempo}\n`);
+
+    if (stats) {
+        linhas.push('*💻 Status do Dell G15:*');
+        linhas.push(`⚙️ CPU: ${stats.cpu_pct}% | RAM: ${stats.ram_pct}% (${stats.ram_usada}/${stats.ram_total} GB)`);
+        if (stats.bateria !== null) {
+            linhas.push(`🔋 Bateria: ${stats.bateria}% ${stats.carregando ? '🔌 Carregando' : stats.na_tomada ? '🔌 Na tomada' : '🔋'}`);
+        }
+        if (stats.gpu_temp !== null) {
+            linhas.push(`🎮 GPU RTX: ${stats.gpu_temp}°C`);
+        }
+        linhas.push(`⚡ Plano: ${stats.plano}`);
+    }
+
+    linhas.push('\n_Todos os sistemas operacionais e prontos para o seu comando!_');
+    return linhas.join('\n');
+};
+
+/**
+ * Envia Magic Packet UDP para acordar o Dell G15 via Wake-on-LAN.
+ * Requer WOL_MAC_ADDRESS definido no .env.
+ */
+const acordarPC = () => {
+    const mac = process.env.WOL_MAC_ADDRESS;
+    if (!mac || !mac.trim()) {
+        return Promise.reject(new Error('WOL_MAC_ADDRESS não configurado no .env'));
+    }
+    const broadcast = process.env.WOL_BROADCAST || '255.255.255.255';
+    const scriptPath = path.join(__dirname, '../scripts/wol.ps1');
+    const cmd = `powershell -ExecutionPolicy Bypass -File "${scriptPath}" -MacAddress "${mac}" -BroadcastAddress "${broadcast}"`;
+    return executar(cmd);
 };
 
 module.exports = {
@@ -158,4 +275,13 @@ module.exports = {
     controlarMidia,
     fecharApp,
     limparSistema,
+    listarDispositivosAudio,
+    definirDispositivoAudio,
+    controleFoco,
+    listarProcessos,
+    matarProcesso,
+    obterPrevisaoTempo,
+    gerarBriefingMatinal,
+    acordarPC,
 };
+

@@ -2,11 +2,14 @@ const express = require('express');
 const router = express.Router();
 const ctrl = require('../controllers/modos.controller');
 
-// Modos de exibição
+// Modos de exibição e cena
 router.get('/gaming',   ctrl.modoGaming);
 router.get('/pirata',   ctrl.modoPirata);
 router.get('/trabalho', ctrl.modoTrabalho);
 router.get('/espelho',  ctrl.modoEspelho);
+router.get('/noturno',  ctrl.modoNoturno);
+router.get('/silencio', ctrl.silencio);
+
 
 // Controle de volume  (ex: /api/volume/75)
 router.get('/volume/:nivel', ctrl.setVolume);

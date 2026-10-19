@@ -132,6 +132,37 @@ const statusTV = async () => {
     };
 };
 
+// --- Controle Remoto Virtual (D-Pad e navegação) ---
+const TV_TECLAS = {
+    cima:     'KEY_UP',
+    baixo:    'KEY_DOWN',
+    esquerda: 'KEY_LEFT',
+    direita:  'KEY_RIGHT',
+    ok:       'KEY_ENTER',
+    enter:    'KEY_ENTER',
+    voltar:   'KEY_RETURN',
+    return:   'KEY_RETURN',
+    home:     'KEY_HOME',
+    menu:     'KEY_MENU',
+    source:   'KEY_SOURCE',
+    info:     'KEY_INFO',
+};
+
+const enviarTeclaTV = async (teclaNome) => {
+    const chave = typeof teclaNome === 'string' ? teclaNome.toLowerCase().trim() : '';
+    const keyCode = Object.prototype.hasOwnProperty.call(TV_TECLAS, chave) ? TV_TECLAS[chave] : null;
+    if (!keyCode) {
+        throw new Error(`Tecla "${teclaNome}" não reconhecida. Disponíveis: ${Object.keys(TV_TECLAS).join(', ')}`);
+    }
+    await tvCommand([{
+        component: 'main',
+        capability: 'samsungtv.remoteControl',
+        command: 'sendKey',
+        arguments: [keyCode],
+    }]);
+    return `Tecla ${teclaNome.toUpperCase()} enviada para a TV!`;
+};
+
 // --- Utilitário para descobrir IDs (use npm run setup:smartthings) ---
 const listarDispositivos = () => stRequest('GET', '/devices');
 
@@ -144,7 +175,10 @@ module.exports = {
     unmuteTV,
     setInputTV,
     abrirAppTV,
+    enviarTeclaTV,
     statusTV,
     TV_APPS,
+    TV_TECLAS,
     listarDispositivos,
 };
+

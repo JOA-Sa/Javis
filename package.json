@@ -6,8 +6,10 @@
   "scripts": {
     "start": "node src/index.js",
     "dev": "nodemon src/index.js",
+    "test": "node scratch/test_simulation.js",
     "setup:smartthings": "node src/scripts/smartthings_setup.js"
   },
+
   "keywords": [],
   "author": "",
   "license": "ISC",

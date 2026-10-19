@@ -44,6 +44,11 @@ const abrirAppTV = stHandler(async (req) => {
     return st.abrirAppTV(app);
 });
 
+const enviarTeclaTV = stHandler(async (req) => {
+    const tecla = req.params.tecla?.toLowerCase();
+    return st.enviarTeclaTV(tecla);
+});
+
 module.exports = {
     ligarTV,
     desligarTV,
@@ -53,4 +58,6 @@ module.exports = {
     setVolumeTV,
     setInputTV,
     abrirAppTV,
+    enviarTeclaTV,
 };
+

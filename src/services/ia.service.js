@@ -3,8 +3,8 @@ const https = require('https');
 const GEMINI_API_KEY = () => process.env.GEMINI_API_KEY;
 const GEMINI_MODEL = () => {
     const configurado = process.env.GEMINI_MODEL?.trim();
-    if (!configurado || /^gemini-2\.0-flash(?:-001)?$/.test(configurado)) {
-        return 'gemini-3.8-flash';
+    if (!configurado || configurado === 'gemini-3.8-flash') {
+        return 'gemini-2.5-flash';
     }
     return configurado;
 };
@@ -12,8 +12,11 @@ const GEMINI_MODEL = () => {
 const COMANDOS_PERMITIDOS = new Set([
     'gaming', 'pirata', 'trabalho', 'espelho', 'noturno', 'silencio',
     'screenshot', 'pc', 'volume', 'brilho', 'suspender', 'tv', 'midia',
-    'bloquear', 'limpar', 'desligar', 'spotify', 'conversa',
+    'bloquear', 'limpar', 'desligar', 'reiniciar', 'cancelar', 'spotify',
+    'tempo', 'processos', 'briefing', 'foco', 'conversa',
 ]);
+
+
 const MIDIA_PERMITIDA = new Set(['playpause', 'play', 'pause', 'next', 'prev', 'stop']);
 const TV_PERMITIDA = new Set([
     'ligar', 'desligar', 'mute', 'unmute', 'hdmi1', 'hdmi2', 'hdmi3',
@@ -194,7 +197,10 @@ const interpretarTexto = async (texto) => {
     if (/trabalh|trampo|estud|foco|notebook/.test(textoLimpo)) {
         return { comando: 'trabalho', resposta: 'Configurando modo trabalho no Dell G15.' };
     }
-    if (/print|screenshot|tela|captura/.test(textoLimpo)) {
+    if (/espelh(?:o|ar|amento)/.test(textoLimpo)) {
+        return { comando: 'espelho', resposta: 'Espelhando a tela na Samsung Crystal 55".' };
+    }
+    if (/print|screenshot|captur(?:a|ar)|foto da tela/.test(textoLimpo)) {
         return { comando: 'screenshot', resposta: 'Capturando a tela agora.' };
     }
     if (/status|temperatura|gpu|cpu|bateria|como t[aá] o pc/.test(textoLimpo)) {
@@ -225,14 +231,35 @@ const interpretarTexto = async (texto) => {
     if (/pr[oó]xim[ao]|passar m[uú]sica|avan[cç]ar/.test(textoLimpo)) {
         return { comando: 'midia', parametro: 'next', resposta: 'Avançando faixa.' };
     }
+    if (/cancelar desligamento|cancela o desligamento|abortar desligamento/.test(textoLimpo)) {
+        return { comando: 'cancelar', resposta: 'Cancelando desligamento agendado.' };
+    }
+    if (/reiniciar pc|reinicia o pc|reiniciar notebook|reiniciar o computador/.test(textoLimpo)) {
+        return { comando: 'reiniciar', parametro: 30, resposta: 'Agendando reinicialização do sistema.' };
+    }
     if (/desligar pc|desliga o pc/.test(textoLimpo)) {
         return { comando: 'desligar', parametro: 30, resposta: 'Agendando desligamento do sistema.' };
     }
-    if (/ligar tv|liga a tv/.test(textoLimpo)) {
+
+    if (/\b(?:desligar|desliga)\s+(?:a\s+)?tv\b/.test(textoLimpo)) {
+        return { comando: 'tv', parametro: 'desligar', resposta: 'Desligando a TV.' };
+    }
+    if (/\b(?:ligar|liga)\s+(?:a\s+)?tv\b/.test(textoLimpo)) {
         return { comando: 'tv', parametro: 'ligar', resposta: 'Ligando a Samsung Crystal.' };
     }
-    if (/desligar tv|desliga a tv/.test(textoLimpo)) {
-        return { comando: 'tv', parametro: 'desligar', resposta: 'Desligando a TV.' };
+
+
+    if (/tempo|clima|previs[aã]o|vai chover|temperatura hoje/.test(textoLimpo)) {
+        return { comando: 'tempo', resposta: 'Consultando a previsão meteorológica.' };
+    }
+    if (/processos|consumo de ram|apps abertos|programas abertos/.test(textoLimpo)) {
+        return { comando: 'processos', resposta: 'Listando processos ativos com maior consumo.' };
+    }
+    if (/briefing|bom dia|relat[oó]rio matinal|status do dia/.test(textoLimpo)) {
+        return { comando: 'briefing', resposta: 'Gerando seu briefing matinal completo.' };
+    }
+    if (/n[aã]o perturbe|modo foco/.test(textoLimpo)) {
+        return { comando: 'foco', parametro: 'alternar', resposta: 'Alternando modo Não Perturbe.' };
     }
 
     const matchBrilho = textoLimpo.match(/brilho.*?(\d+)/);
@@ -288,7 +315,50 @@ const interpretarAudio = async (base64Audio, mimetype) => {
     }
 };
 
+/**
+ * Transcreve com precisão e resume áudios longos ou encaminhados
+ */
+const transcreverESumarizarAudio = async (base64Audio, mimetype) => {
+    if (!GEMINI_API_KEY()) {
+        return '🎙️ Para transcrever e resumir áudios com inteligência artificial, adicione sua *GEMINI_API_KEY* gratuita no arquivo *.env*.';
+    }
+
+    try {
+        const prompt = `Você é o Jarvis. Ouça o áudio com máxima atenção e retorne:
+📝 *Transcrição:*
+(Transcrição fiel do que foi dito)
+
+💡 *Resumo Executivo:*
+• (Pontos principais e ações em tópicos concisos)
+
+Formate com elegância para leitura no WhatsApp.`;
+
+        const corpo = {
+            contents: [
+                {
+                    parts: [
+                        { text: prompt },
+                        {
+                            inlineData: {
+                                mimeType: mimetype || 'audio/ogg; codecs=opus',
+                                data: base64Audio,
+                            },
+                        },
+                    ],
+                },
+            ],
+        };
+
+        return await chamarGemini(corpo);
+    } catch (err) {
+        console.error('[❌] Erro ao transcrever/resumir áudio:', err.message);
+        return '❌ Falha ao processar a transcrição deste áudio com a IA.';
+    }
+};
+
 module.exports = {
     interpretarTexto,
     interpretarAudio,
+    transcreverESumarizarAudio,
 };
+

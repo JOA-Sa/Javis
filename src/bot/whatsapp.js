@@ -176,7 +176,17 @@ const TV_CMDS = {
     'prime':    () => st.abrirAppTV('prime'),
     'disney':   () => st.abrirAppTV('disney'),
     'spotify':  () => st.abrirAppTV('spotify'),
+    'cima':     () => st.enviarTeclaTV('cima'),
+    'baixo':    () => st.enviarTeclaTV('baixo'),
+    'esquerda': () => st.enviarTeclaTV('esquerda'),
+    'direita':  () => st.enviarTeclaTV('direita'),
+    'ok':       () => st.enviarTeclaTV('ok'),
+    'enter':    () => st.enviarTeclaTV('ok'),
+    'voltar':   () => st.enviarTeclaTV('voltar'),
+    'home':     () => st.enviarTeclaTV('home'),
+    'menu':     () => st.enviarTeclaTV('menu'),
 };
+
 
 const MODO_CMDS = {
     'performance': () => dell.modoPerformance(),
@@ -312,7 +322,13 @@ async function executarIntencao(intencao, msg, eraAudio = false) {
             }
             return responder(msg, `✅ ${await service.desligar(parametro)}`);
         }
+        case 'reiniciar': {
+            const delay = Number.isSafeInteger(parametro) && parametro >= 0 && parametro <= 86400 ? parametro : 30;
+            return responder(msg, `✅ ${await service.reiniciar(delay)}`);
+        }
+        case 'cancelar': return responder(msg, `✅ ${await service.cancelarDesligamento()}`);
         case 'suspender': return responder(msg, `✅ ${await sistema.suspenderPC()}`);
+
         case 'bloquear':  return responder(msg, `✅ ${await sistema.bloquearTela()}`);
         case 'limpar':    return responder(msg, `✅ ${await sistema.limparSistema()}`);
         case 'brilho': {
@@ -331,7 +347,27 @@ async function executarIntencao(intencao, msg, eraAudio = false) {
             const stats = await sistema.pcStats();
             return responder(msg, sistema.formatarStats(stats));
         }
+        case 'tempo': {
+            const previsao = await sistema.obterPrevisaoTempo('Sao_Paulo');
+            return responder(msg, `🌤️ *Previsão do Tempo:* ${previsao}`);
+        }
+        case 'processos': {
+            const procs = await sistema.listarProcessos();
+            const linhas = procs.slice(0, 6).map(p => `• *${p.nome}* (PID ${p.pid}) — ${p.ram} MB | CPU: ${p.cpu}%`);
+            return responder(msg, `📊 *Top Processos Ativos:*\n${linhas.join('\n')}`);
+        }
+        case 'briefing': {
+            const briefing = await sistema.gerarBriefingMatinal();
+            return responder(msg, briefing);
+        }
+        case 'foco': {
+            const status = await sistema.controleFoco('status');
+            const nova = status.nao_perturbe ? 'desativar' : 'ativar';
+            const res = await sistema.controleFoco(nova);
+            return responder(msg, `🔕 ${res}`);
+        }
         case 'screenshot': {
+
             const filePath = await sistema.screenshot();
             if (fs.existsSync(filePath)) {
                 const media = MessageMedia.fromFilePath(filePath);
@@ -376,12 +412,21 @@ async function handleMensagem(msg) {
         return;
     }
 
-    // ── 1. Tratamento de Áudios de Voz (PTT) ────────
+    // ── 1. Tratamento de Áudios de Voz (PTT e Mídia) ────────
     if (msg.hasMedia && (msg.type === 'audio' || msg.type === 'ptt')) {
         console.log('[🎙️] Mensagem de áudio recebida');
         try {
             const media = await msg.downloadMedia();
             if (media && media.data) {
+                // Se for um áudio encaminhado, o usuário quer saber o que foi dito nele
+                if (msg.isForwarded) {
+                    reagir(msg, '📝');
+                    console.log('[📝] Áudio encaminhado recebido — transcrevendo com IA...');
+                    const transcricao = await ia.transcreverESumarizarAudio(media.data, media.mimetype);
+                    return responder(msg, transcricao);
+                }
+
+                // Áudio de comando para o Jarvis
                 const intencao = await ia.interpretarAudio(media.data, media.mimetype);
                 await executarIntencao(intencao, msg, true);
             }
@@ -390,6 +435,7 @@ async function handleMensagem(msg) {
         }
         return;
     }
+
 
     if (!textoBruto) return;
 
