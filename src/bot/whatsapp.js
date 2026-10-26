@@ -11,6 +11,9 @@ const tts = require('../services/tts.service');
 const monitor = require('../services/monitor.service');
 const downloader = require('../services/downloader.service');
 const tunnel = require('../services/tunnel.service');
+const streaming = require('../services/streaming.service');
+const gamer = require('../services/gamer.service');
+const spotify = require('../services/spotify.service');
 
 // ─────────────────────────────────────────────────
 //  CLIENTE WHATSAPP COM AUTO-RECONEXÃO
@@ -60,6 +63,7 @@ const criarCliente = () => {
 
         // Inicia o monitoramento proativo de bateria e temperatura do Dell G15
         monitor.iniciarMonitor(clientAtual);
+        gamer.iniciarMonitorGamer(clientAtual);
 
         // Notificação automática do link remoto para o próprio WhatsApp do usuário
         let linkEnviado = false;
@@ -94,6 +98,7 @@ const criarCliente = () => {
         if (clientAtual !== client) return;
         console.log(`[⚠️] Bot desconectado: ${reason}`);
         monitor.pararMonitor();
+        gamer.pararMonitorGamer();
         tentarReconectar(clientAtual);
     });
 
@@ -250,7 +255,13 @@ const mensagemAjuda = () => [
     '\n*⏯️ Controle de Mídia:*',
     '• *!play* / *!pause* — Play/Pause global',
     '• *!proxima* / *!anterior* — Passar faixa',
-    '• *!baixar <link>* — Baixa vídeo ou magnet de torrent',
+    '• *!assistir <título>* — Busca onde passa e abre na TV Samsung
+    • *!tocar <música>* — Toca no Spotify do Dell G15 ou TV
+    • *!mp3 <link>* — Extrai áudio MP3 de vídeo e manda no WhatsApp
+    • *!bomdia* — Resumo matinal falado por voz neural
+    • *!clip <texto>* — Copia texto direto para o Ctrl+V do PC
+    • *!organizar* — Organiza arquivos da pasta Downloads
+    • *!baixar <link>* — Baixa vídeo ou magnet de torrent',
     '• *!falar <texto>* — Jarvis responde com nota de voz',
     '• *!link* ou *!painel* — Link de acesso remoto no Galaxy S23 (4G/5G)',
 
@@ -385,6 +396,25 @@ async function executarIntencao(intencao, msg, eraAudio = false) {
             const procs = await sistema.listarProcessos();
             const linhas = procs.slice(0, 6).map(p => `• *${p.nome}* (PID ${p.pid}) — ${p.ram} MB | CPU: ${p.cpu}%`);
             return responder(msg, `📊 *Top Processos Ativos:*\n${linhas.join('\n')}`);
+        }
+        case 'assistir': {
+            const titulo = parametro || '';
+            if (!titulo) return responder(msg, '❌ Por favor, informe o nome do filme ou série.');
+            responder(msg, '🎬 Pesquisando catálogo e disponibilidade de "' + titulo + '"...');
+            const res = await streaming.processarPedidoAssistir(titulo);
+            return responder(msg, res.mensagem);
+        }
+        case 'spotify': {
+            const res = await spotify.tocarMusica(parametro);
+            return responder(msg, res);
+        }
+        case 'clip': {
+            const res = await sistema.definirClipboard(parametro);
+            return responder(msg, '📋 ' + res);
+        }
+        case 'organizar': {
+            const res = await sistema.organizarDownloads();
+            return responder(msg, '📁 ' + res);
         }
         case 'briefing': {
             const briefing = await sistema.gerarBriefingMatinal();
@@ -525,6 +555,66 @@ async function handleMensagem(msg) {
         if (comando === '!hora')  return responder(msg, `🕐 ${sistema.hora()}`);
 
         // Voz do Jarvis sob demanda
+        // 🎬 Catálogo Inteligente de Streaming e Smart TV
+        if (comando === '!assistir' || comando === '!filme' || comando === '!serie') {
+            const titulo = partes.slice(1).join(' ');
+            if (!titulo) return responder(msg, '❌ Uso: *!assistir <nome do filme ou série>*\nExemplo: *!assistir Friends*');
+            responder(msg, '🎬 Pesquisando disponibilidade de "' + titulo + '" nos seus streamings...');
+            const res = await streaming.processarPedidoAssistir(titulo);
+            return responder(msg, res.mensagem);
+        }
+
+        // 🎵 Spotify & Música
+        if (comando === '!tocar') {
+            const termo = partes.slice(1).join(' ');
+            if (!termo) return responder(msg, '❌ Uso: *!tocar <música, artista ou playlist>*');
+            const res = await spotify.tocarMusica(termo);
+            return responder(msg, res);
+        }
+
+        // 📥 Extrator de Áudio MP3 para WhatsApp
+        if (comando === '!mp3') {
+            const link = partes[1];
+            if (!link) return responder(msg, '❌ Uso: *!mp3 <link do youtube ou reels>*');
+            responder(msg, '⏳ Baixando e extraindo áudio MP3, aguarde alguns segundos...');
+            try {
+                const caminhoAudio = await downloader.baixarAudioMp3(link);
+                const midia = MessageMedia.fromFilePath(caminhoAudio);
+                await client.sendMessage(msg.from, midia, { sendAudioAsVoice: false });
+                fs.unlink(caminhoAudio, () => {});
+                return responder(msg, '🎵 Áudio extraído e enviado com sucesso!');
+            } catch (err) {
+                return responder(msg, '❌ ' + err.message);
+            }
+        }
+
+        // ☀️ Briefing Matinal Falado
+        if (comando === '!bomdia' || comando === '!briefing') {
+            const briefingTexto = await sistema.gerarBriefingMatinal();
+            await responder(msg, briefingTexto);
+            try {
+                const audioPath = await tts.falar(briefingTexto);
+                const audioMedia = MessageMedia.fromFilePath(audioPath);
+                await client.sendMessage(msg.from, audioMedia, { sendAudioAsVoice: true });
+                fs.unlink(audioPath, () => {});
+            } catch (_) {}
+            return;
+        }
+
+        // 📋 Clipboard Integrado (Celular -> PC)
+        if (comando === '!clip' || comando === '!clipboard') {
+            const textoClip = partes.slice(1).join(' ');
+            if (!textoClip) return responder(msg, '❌ Uso: *!clip <texto para copiar para o PC>*');
+            const res = await sistema.definirClipboard(textoClip);
+            return responder(msg, '📋 ' + res);
+        }
+
+        // 📁 Organizador de Downloads
+        if (comando === '!organizar') {
+            const res = await sistema.organizarDownloads();
+            return responder(msg, '📁 ' + res);
+        }
+
         if (comando === '!falar') {
             const falaTexto = partes.slice(1).join(' ');
             if (!falaTexto) return responder(msg, '❌ Uso: *!falar <texto a ser dito>*');

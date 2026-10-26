@@ -102,7 +102,13 @@ const TV_APPS = {
     youtube:  'com.samsung.tv.youtube',
     prime:    'org.tizen.primevideo',
     disney:   'MCmYXNxgcu.DisneyPlusAmazon',
-    spotify:  'kIciSQlYEM.Spotify',
+    spotify:   'kIciSQlYEM.Spotify',
+    max:       'com.hbo.max',
+    hbomax:    'com.hbo.max',
+    apple:     'org.tizen.apple-tv',
+    appletv:   'org.tizen.apple-tv',
+    globoplay: 'com.globo.globoplay',
+    paramount: 'com.cbs.ott.tizen',
 };
 
 const abrirAppTV = async (appKey) => {

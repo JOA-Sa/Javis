@@ -264,6 +264,70 @@ const acordarPC = () => {
     return executar(cmd);
 };
 
+/**
+ * Copia um texto para a Área de Transferência (Clipboard) do Windows.
+ */
+const definirClipboard = async (texto) => {
+    if (!texto || typeof texto !== 'string' || !texto.trim()) {
+        throw new Error('Informe o texto para copiar.');
+    }
+    const limpo = texto.trim();
+    const script = `Set-Clipboard -Value @'\n${limpo.replace(/'/g, "''")}\n'@`;
+    await executar(`powershell -NoProfile -Command "${script}"`);
+    return 'Texto copiado com sucesso para a Área de Transferência do Dell G15!';
+};
+
+/**
+ * Organiza arquivos soltos na pasta Downloads em subpastas organizadas.
+ */
+const organizarDownloads = async () => {
+    const downloadsPath = path.join(os.homedir(), 'Downloads');
+    if (!fs.existsSync(downloadsPath)) {
+        throw new Error('Pasta Downloads não encontrada.');
+    }
+
+    const categorias = {
+        Instaladores: ['.exe', '.msi', '.bat'],
+        Documentos: ['.pdf', '.docx', '.doc', '.xlsx', '.xls', '.pptx', '.txt', '.csv'],
+        Imagens: ['.jpg', '.jpeg', '.png', '.webp', '.gif', '.svg', '.bmp', '.ico'],
+        Videos: ['.mp4', '.mkv', '.avi', '.mov', '.wmv', '.webm'],
+        Compactados: ['.zip', '.rar', '.7z', '.tar', '.gz'],
+        Musicas: ['.mp3', '.wav', '.flac', '.m4a', '.ogg'],
+    };
+
+    for (const pasta of Object.keys(categorias)) {
+        const p = path.join(downloadsPath, pasta);
+        if (!fs.existsSync(p)) fs.mkdirSync(p, { recursive: true });
+    }
+
+    const arquivos = fs.readdirSync(downloadsPath, { withFileTypes: true });
+    let movidos = 0;
+
+    for (const item of arquivos) {
+        if (!item.isFile()) continue;
+        const ext = path.extname(item.name).toLowerCase();
+        let destinoPasta = null;
+
+        for (const [pasta, extensoes] of Object.entries(categorias)) {
+            if (extensoes.includes(ext)) {
+                destinoPasta = pasta;
+                break;
+            }
+        }
+
+        if (destinoPasta) {
+            const origem = path.join(downloadsPath, item.name);
+            const destino = path.join(downloadsPath, destinoPasta, item.name);
+            try {
+                fs.renameSync(origem, destino);
+                movidos++;
+            } catch (_) {}
+        }
+    }
+
+    return `Pasta Downloads organizada! ${movidos} arquivos movidos para as pastas apropriadas.`;
+};
+
 module.exports = {
     screenshot,
     pcStats,
@@ -283,5 +347,7 @@ module.exports = {
     obterPrevisaoTempo,
     gerarBriefingMatinal,
     acordarPC,
+    definirClipboard,
+    organizarDownloads,
 };
 

@@ -13,7 +13,7 @@ const COMANDOS_PERMITIDOS = new Set([
     'gaming', 'pirata', 'trabalho', 'espelho', 'noturno', 'silencio',
     'screenshot', 'pc', 'volume', 'brilho', 'suspender', 'tv', 'midia',
     'bloquear', 'limpar', 'desligar', 'reiniciar', 'cancelar', 'spotify',
-    'tempo', 'processos', 'briefing', 'foco', 'conversa',
+    'tempo', 'processos', 'briefing', 'foco', 'conversa', 'assistir', 'clip', 'organizar', 'mp3',
 ]);
 
 
@@ -78,6 +78,11 @@ const sanitizarIntencao = (dados) => {
             : lerInteiroSeguro(dados.parametro, 0, 86400);
         if (parametro === null) {
             return conversaSegura('Não consegui validar o tempo para desligar o PC.');
+        }
+    } else if (['assistir', 'spotify', 'clip', 'mp3'].includes(comando)) {
+        parametro = typeof dados.parametro === 'string' ? dados.parametro.trim().slice(0, 300) : '';
+        if (!parametro) {
+            return conversaSegura('Por favor, informe o título, música ou texto desejado.');
         }
     } else if (comando === 'midia') {
         parametro = typeof dados.parametro === 'string' ? dados.parametro.toLowerCase() : '';
@@ -151,7 +156,13 @@ Seu objetivo é interpretar a mensagem (seja texto ou áudio) e categorizar a in
 
 Responda ESTRITAMENTE em formato JSON (sem blocos markdown, apenas o JSON puro):
 {
-  "comando": "gaming" | "pirata" | "trabalho" | "espelho" | "noturno" | "silencio" | "screenshot" | "pc" | "volume" | "brilho" | "suspender" | "tv" | "midia" | "bloquear" | "limpar" | "desligar" | "spotify" | "conversa",
+  "comando": "assistir" | "spotify" | "gaming" | "pirata" | "trabalho" | "espelho" | "noturno" | "silencio" | "screenshot" | "pc" | "volume" | "brilho" | "suspender" | "tv" | "midia" | "bloquear" | "limpar" | "desligar" | "briefing" | "organizar" | "clip" | "conversa",
+  // IMPORTANTE:
+  // - Para "gostaria de assistir X", "onde passa X", "quero ver X": use comando="assistir", parametro="Nome do filme ou serie"
+  // - Para "tocar X", "toca queen", "ouvir musica": use comando="spotify", parametro="Nome da musica ou playlist"
+  // - Para "bom dia", "briefing": use comando="briefing"
+  // - Para "organizar downloads": use comando="organizar"
+  // - Para "copiar para o pc X": use comando="clip", parametro="texto"
   "parametro": string ou numero (se houver, ex: 50 para volume ou brilho, "netflix" ou "ligar" ou "desligar" para tv, "playpause" ou "next" para midia),
   "resposta": "Uma resposta concisa com personalidade do Jarvis ao usuário"
 }
@@ -188,6 +199,30 @@ const interpretarTexto = async (texto) => {
     }
 
     // Motor local de interpretação semântica / NLP por palavras-chave
+    // Comandos semânticos especializados
+    const matchAssistir = textoLimpo.match(/(?:assistir|onde passa|onde tem|quero ver|coloca na tv|colocar na tv)\s+(.+)/i);
+    if (matchAssistir) {
+        const param = matchAssistir[1].trim();
+        if (/^(?:um filme|filme|cinema|s[eé]rie|algo|tv)$/i.test(param)) {
+            return { comando: 'pirata', resposta: 'Iniciando modo cinema na TV.' };
+        }
+        return { comando: 'assistir', parametro: param, resposta: `Pesquisando disponibilidade de "${param}" nos streamings...` };
+    }
+    const matchTocar = textoLimpo.match(/(?:tocar|toca|coloque para tocar|reproduzir|ouvir)\s+(.+)/i);
+    if (matchTocar) {
+        return { comando: 'spotify', parametro: matchTocar[1].trim(), resposta: `Buscando "${matchTocar[1].trim()}" no Spotify...` };
+    }
+    if (/bom dia|briefing|resumo do dia|como est[aá] o dia/.test(textoLimpo)) {
+        return { comando: 'briefing', resposta: 'Preparando seu resumo matinal, senhor.' };
+    }
+    if (/organizar downloads|organizar pasta|arrumar downloads/.test(textoLimpo)) {
+        return { comando: 'organizar', resposta: 'Organizando sua pasta de Downloads agora.' };
+    }
+    const matchClip = textoLimpo.match(/(?:copiar|copia para o pc|copiar para o pc|clip|clipboard)\s+(.+)/i);
+    if (matchClip) {
+        return { comando: 'clip', parametro: matchClip[1].trim(), resposta: 'Copiando para a área de transferência do PC.' };
+    }
+
     if (/jogar|game|gaming|steam|jogatina/.test(textoLimpo)) {
         return { comando: 'gaming', resposta: 'Preparando o ambiente para games, senhor.' };
     }
@@ -356,7 +391,22 @@ Formate com elegância para leitura no WhatsApp.`;
     }
 };
 
+/**
+ * Consulta livre ao modelo Gemini em texto puro.
+ */
+const consultarTexto = async (promptTexto) => {
+    const corpo = {
+        contents: [
+            {
+                parts: [{ text: promptTexto }],
+            },
+        ],
+    };
+    return await chamarGemini(corpo);
+};
+
 module.exports = {
+    consultarTexto,
     interpretarTexto,
     interpretarAudio,
     transcreverESumarizarAudio,

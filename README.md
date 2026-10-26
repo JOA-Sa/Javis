@@ -21,47 +21,43 @@ Assistente autônomo e centro de comando para o ecossistema: **Dell G15 5525**, 
               [ Camada de Serviços do Jarvis ]
  ┌──────────────┬──────────────┬──────────────┬──────────────┐
  ▼              ▼              ▼              ▼              ▼
-Dell G15       Samsung TV     Monitoramento   Síntese Voz    Downloader
-(RTX, Bateria, (SmartThings   Proativo        (TTS Neural)   (Torrents,
-Planos, RAM)   Crystal 55")   (Alertas Zap)   (Responde Voz) Vídeos)
+Dell G15       Samsung TV     Monitoramento   Síntese Voz    Streaming & IA
+(RTX, Bateria, (SmartThings   Gamer & PC      (TTS Neural)   (Catálogo TV,
+Planos, RAM)   Crystal 55")   (Alertas Zap)   (Responde Voz) Spotify, Zap)
 ```
 
 ---
 
-## 🚀 Todos os Recursos Implementados
+## 🚀 Recursos Implementados
 
-### 1. 🖥️ Executável Oficial do Windows (`Jarvis.exe`)
-* **Ativação com 1 Clique**: Um aplicativo nativo do Windows compilado sob medida com ícone próprio na sua Área de Trabalho.
-* Inicia o servidor Node.js e o túnel seguro de acesso remoto simultaneamente.
-* Exibe o status da porta 3000, link local e link HTTPS remoto para o Galaxy S23.
-* Opção de copiar o link do celular com um toque ou minimizar o Jarvis para rodar silenciosamente em segundo plano.
+### 1. 🎬 Catálogo de Streaming & Abertura Automática na TV
+* **Comando ou Linguagem Natural**: Envie `!assistir Friends` ou áudio/texto como *"Gostaria de assistir Friends"*.
+* O Jarvis pesquisa onde o título está disponível no Brasil.
+* Compara com os seus streamings configurados em `MEUS_STREAMINGS` (Netflix, Max, Prime, Disney+, etc.).
+* **Abertura Inteligente**: Se estiver incluso na sua assinatura, liga a TV Samsung Crystal 55" e abre o aplicativo na hora! Se exigir compra/aluguel, te informa os valores exatos.
 
-### 2. 🌐 Acesso no Celular Independente da Distância
-* **Túnel Seguro Automático (Cloudflare Tunnel)**: O Jarvis inicia o túnel em segundo plano sem precisar configurar portas no roteador.
-* **Link Direto no WhatsApp**: Assim que o Jarvis é ativado, ele envia automaticamente o link do seu painel no seu WhatsApp (chat pessoal).
-* **Autenticação Instantânea**: O link já carrega o token seguro (`?key=...`), abrindo o PWA no Galaxy S23 logado de primeira.
-* **Comandos `!link` ou `!painel` no WhatsApp**: Peça o link a qualquer momento pelo chat caso precise reabrir.
+### 2. 🎮 Detecção Gamer Automática (Dell G15 RTX)
+* O Jarvis monitora em segundo plano jogos em execução (CS2, Valorant, GTA V, Cyberpunk, Apex, etc.).
+* Ao abrir um jogo: ativa o plano de **Alto Desempenho**, limpa o cache de RAM para a RTX e te avisa no WhatsApp.
+* Ao fechar o jogo: retorna automaticamente para o modo **Balanceado**.
 
-### 3. 🗣️ Jarvis Falante — Respostas em Áudio (TTS Neural)
-* **Respostas com Voz no WhatsApp**: Quando você envia um áudio, o Jarvis não só responde em texto como também manda uma **nota de voz com voz natural brasileira** no WhatsApp!
-* **Comando `!falar <texto>`**: Peça para o Jarvis falar qualquer mensagem via áudio.
+### 3. 🎵 Spotify & Extração de MP3
+* `!tocar <música/artista>`: Abre e busca instantaneamente no Spotify do PC ou TV.
+* `!mp3 <link>`: Baixa vídeos do YouTube/Reels, extrai o áudio em MP3 de alta qualidade e te envia o arquivo diretamente no WhatsApp.
 
-### 4. 🛡️ Monitoramento Proativo Autônomo (Ele te avisa no WhatsApp)
-O Jarvis monitora o Dell G15 silenciosamente a cada 2 minutos em segundo plano:
-* **Alerta de Bateria Crítica**: Se o notebook estiver fora da tomada e a bateria cair para **<= 20%**, você recebe um aviso no WhatsApp no S23 para ligar na tomada antes que desligue.
-* **Alerta Térmico da RTX**: Se a placa de vídeo atingir **>= 85°C**, ele te avisa para ventilar o notebook.
+### 4. 🧠 Produtividade & IA Pessoal
+* `!bomdia`: Envia um relatório matinal completo em texto e uma **nota de voz com voz neural** (previsão do tempo, saúde da bateria do Dell G15 e mensagem do dia).
+* `!clip <texto>`: Copia o texto do seu WhatsApp diretamente para a Área de Transferência (`Ctrl + V`) do notebook.
+* `!organizar`: Faz a triagem automática de arquivos soltos na pasta Downloads do Windows (move instaladores, fotos, documentos, vídeos para pastas próprias).
 
-### 5. 📥 Downloader de Mídias e Torrents (`!baixar`)
-* `!baixar <link>`:
-  * **Links Magnet de Torrent**: Inicia o download automaticamente no seu cliente de torrent (qBittorrent/uTorrent) no PC.
-  * **Links de Vídeo**: Envie links do YouTube, Reels ou mídias para salvar direto na sua pasta de Downloads.
+### 5. 🖥️ Executável Nativo do Windows (`Jarvis.exe`)
+* Ativação com 1 clique na sua Área de Trabalho (`JARVIS.lnk`).
+* Inicia o servidor e o túnel seguro de acesso remoto simultaneamente.
 
-### 6. 📍 Webhooks para Modos e Rotinas do Samsung S23
-Rotas prontas para acionamento por geolocalização ou horário:
-* `/api/webhook/cheguei` ➔ Chegando em casa (liga TV, abre Spotify).
-* `/api/webhook/sair` ➔ Saindo de casa (desliga TV, bloqueia a tela do Windows).
-* `/api/webhook/dormir` ➔ Ao plugar no carregador à noite (Modo Noturno).
-* `/api/webhook/acordar` ➔ De manhã (Modo Trabalho).
+### 6. 🌐 Acesso no Celular Independente da Distância
+* Envio automático do link seguro do Cloudflare Tunnel no seu WhatsApp pessoal ao iniciar.
+* Autenticação com 1 clique via token embutido (`?key=...`).
+* Comandos `!link` e `!painel` para recuperar o endereço do PWA em qualquer lugar (4G/5G).
 
 ---
 
@@ -70,7 +66,13 @@ Rotas prontas para acionamento por geolocalização ou horário:
 | Comando | Descrição |
 |---|---|
 | `!ajuda` | Mostra todos os comandos |
-| `!link` / `!painel` | Envia o link de acesso remoto seguro no Galaxy S23 |
+| `!assistir <título>` | Busca onde passa (Netflix, Max, Prime, Disney+) e abre na TV Samsung |
+| `!tocar <música>` | Toca no Spotify do Dell G15 ou TV |
+| `!mp3 <link>` | Extrai áudio MP3 de vídeo e envia direto no WhatsApp |
+| `!bomdia` | Resumo matinal falado por voz neural com clima e status |
+| `!clip <texto>` | Copia texto do celular para o `Ctrl + V` do Windows |
+| `!organizar` | Organiza arquivos da pasta Downloads do Dell G15 |
+| `!link` / `!painel` | Envia o link de acesso remoto seguro no Galaxy S23 (4G/5G) |
 | `!gaming` | TV no HDMI, G15 em Alto Desempenho e Steam na tela grande |
 | `!pirata` | TV no HDMI, volume equilibrado e navegador em tela cheia |
 | `!trabalho` | Desliga a TV e foca no notebook |

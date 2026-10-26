@@ -175,4 +175,40 @@ const baixarMidia = async (valorUrl) => {
     return `Arquivo baixado na sua pasta Downloads: ${nomeArquivo}`;
 };
 
-module.exports = { baixarMidia };
+/**
+ * Baixa o áudio de um vídeo e salva como MP3 temporário para envio.
+ */
+const baixarAudioMp3 = async (valorUrl) => {
+    if (typeof valorUrl !== 'string' || !valorUrl.trim()) {
+        throw new Error('URL ou link não informado.');
+    }
+    const url = validarUrlWeb(valorUrl.trim());
+    const tempDir = os.tmpdir();
+    const nomeBase = `jarvis_audio_${Date.now()}`;
+    const templateSaida = path.join(tempDir, `${nomeBase}.%(ext)s`);
+
+    const binYtDlp = fs.existsSync(path.join(__dirname, '../../bin/yt-dlp.exe'))
+        ? path.join(__dirname, '../../bin/yt-dlp.exe')
+        : 'yt-dlp';
+
+    console.log(`[🎵] Extraindo áudio MP3 de: ${url.href}...`);
+    try {
+        await executarPrograma(binYtDlp, [
+            '-x',
+            '--audio-format', 'mp3',
+            '-o', templateSaida,
+            url.href,
+        ], { timeout: 10 * 60 * 1000 });
+
+        const arquivoGerado = path.join(tempDir, `${nomeBase}.mp3`);
+        if (fs.existsSync(arquivoGerado)) {
+            return arquivoGerado;
+        }
+    } catch (err) {
+        console.warn('[⚠️] Falha ao extrair áudio com yt-dlp:', err.message);
+    }
+
+    throw new Error('Não foi possível extrair o áudio deste link. Verifique se o yt-dlp está disponível.');
+};
+
+module.exports = { baixarMidia, baixarAudioMp3 };
