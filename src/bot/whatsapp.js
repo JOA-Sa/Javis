@@ -255,13 +255,13 @@ const mensagemAjuda = () => [
     '\n*⏯️ Controle de Mídia:*',
     '• *!play* / *!pause* — Play/Pause global',
     '• *!proxima* / *!anterior* — Passar faixa',
-    '• *!assistir <título>* — Busca onde passa e abre na TV Samsung
-    • *!tocar <música>* — Toca no Spotify do Dell G15 ou TV
-    • *!mp3 <link>* — Extrai áudio MP3 de vídeo e manda no WhatsApp
-    • *!bomdia* — Resumo matinal falado por voz neural
-    • *!clip <texto>* — Copia texto direto para o Ctrl+V do PC
-    • *!organizar* — Organiza arquivos da pasta Downloads
-    • *!baixar <link>* — Baixa vídeo ou magnet de torrent',
+    '• *!assistir <título>* — Busca onde passa e abre na TV Samsung',
+    '• *!tocar <música>* — Toca no Spotify do Dell G15 ou TV',
+    '• *!mp3 <link>* — Extrai áudio MP3 de vídeo e manda no WhatsApp',
+    '• *!bomdia* — Resumo matinal falado por voz neural',
+    '• *!clip <texto>* — Copia texto direto para o Ctrl+V do PC',
+    '• *!organizar* — Organiza arquivos da pasta Downloads',
+    '• *!baixar <link>* — Baixa vídeo ou magnet de torrent',
     '• *!falar <texto>* — Jarvis responde com nota de voz',
     '• *!link* ou *!painel* — Link de acesso remoto no Galaxy S23 (4G/5G)',
 

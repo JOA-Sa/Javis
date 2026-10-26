@@ -4,8 +4,8 @@ let timerMonitor = null;
 let ultimoAlertaBateria = 0;
 let ultimoAlertaGPU = 0;
 
-const COOLDOWN_BATERIA_MS = 30 * 60 * 1000; // 30 minutos
-const COOLDOWN_GPU_MS     = 15 * 60 * 1000; // 15 minutos
+const COOLDOWN_BATERIA_MS = 60 * 60 * 1000; // 30 minutos
+const COOLDOWN_GPU_MS     = 60 * 60 * 1000; // 15 minutos
 
 /**
  * Inicia o monitoramento proativo em segundo plano do Dell G15.
