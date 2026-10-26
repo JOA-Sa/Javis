@@ -1,11 +1,15 @@
 const express = require('express');
 const router = express.Router();
 const ctrl = require('../controllers/sistema.controller');
+const tunnel = require('../services/tunnel.service');
 
 // Telemetria, Captura de Tela e Streaming SSE em tempo real
 router.get('/stats',      ctrl.getStats);
 router.get('/stream',     ctrl.streamStats);
 router.get('/screenshot', ctrl.getScreenshot);
+
+// Status do Túnel Remoto
+router.get('/tunnel',     (req, res) => res.json({ url: tunnel.obterUrl() }));
 
 // Segurança e Manutenção
 router.get('/bloquear',   ctrl.bloquear);
@@ -33,6 +37,5 @@ router.get('/midia/:acao', ctrl.midia);
 
 // Fechar Aplicativo
 router.get('/fechar/:app', ctrl.fechar);
-
 
 module.exports = router;

@@ -9,6 +9,7 @@ const rotasDell    = require('./routes/dell.routes');
 const rotasSistema = require('./routes/sistema.routes');
 const rotasWebhook = require('./routes/webhook.routes');
 const { iniciarBot } = require('./bot/whatsapp');
+const tunnel = require('./services/tunnel.service');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -42,4 +43,5 @@ app.listen(PORT, () => {
     console.log(`[🚀] Jarvis Local rodando na porta ${PORT}`);
     console.log(`[📱] Painel Web disponível em: http://localhost:${PORT}`);
     iniciarBot();
+    tunnel.iniciarTunnel(PORT);
 });

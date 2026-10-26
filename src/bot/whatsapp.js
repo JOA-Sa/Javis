@@ -10,6 +10,7 @@ const ia = require('../services/ia.service');
 const tts = require('../services/tts.service');
 const monitor = require('../services/monitor.service');
 const downloader = require('../services/downloader.service');
+const tunnel = require('../services/tunnel.service');
 
 // ─────────────────────────────────────────────────
 //  CLIENTE WHATSAPP COM AUTO-RECONEXÃO
@@ -59,6 +60,34 @@ const criarCliente = () => {
 
         // Inicia o monitoramento proativo de bateria e temperatura do Dell G15
         monitor.iniciarMonitor(clientAtual);
+
+        // Notificação automática do link remoto para o próprio WhatsApp do usuário
+        let linkEnviado = false;
+        const enviarLinkRemoto = async (url) => {
+            if (linkEnviado || !url) return;
+            try {
+                if (clientAtual && clientAtual.info && clientAtual.info.wid) {
+                    linkEnviado = true;
+                    const keyParam = process.env.API_KEY ? '?key=' + process.env.API_KEY : '';
+                    const linkCompleto = url + keyParam;
+                    const meJid = clientAtual.info.wid._serialized;
+                    await clientAtual.sendMessage(
+                        meJid,
+                        '🚀 *Jarvis Online & Acesso Remoto Ativo!*\n\n📱 *Painel no Celular (Galaxy S23):*\n' + linkCompleto + '\n\nAbra o link acima de qualquer lugar do mundo (4G/5G) para acessar a central de comando.'
+                    );
+                    console.log('[📱] Link de acesso remoto enviado para seu WhatsApp!');
+                }
+            } catch (err) {
+                console.error('[⚠️] Não foi possível enviar o link remoto via WhatsApp:', err.message);
+            }
+        };
+
+        const urlAtual = tunnel.obterUrl();
+        if (urlAtual) {
+            enviarLinkRemoto(urlAtual);
+        } else {
+            tunnel.onTunnelUrl(enviarLinkRemoto);
+        }
     });
 
     clientAtual.on('disconnected', (reason) => {
@@ -223,6 +252,7 @@ const mensagemAjuda = () => [
     '• *!proxima* / *!anterior* — Passar faixa',
     '• *!baixar <link>* — Baixa vídeo ou magnet de torrent',
     '• *!falar <texto>* — Jarvis responde com nota de voz',
+    '• *!link* ou *!painel* — Link de acesso remoto no Galaxy S23 (4G/5G)',
 
     '\n*📺 Samsung Crystal 55" (SmartThings):*',
     '• *!tv ligar / desligar / mute*',
@@ -482,6 +512,15 @@ async function handleMensagem(msg) {
         } catch (_) {}
 
         // Ajuda e Utilidades
+        if (comando === '!link' || comando === '!painel') {
+            const url = tunnel.obterUrl();
+            if (url) {
+                const keyParam = process.env.API_KEY ? '?key=' + process.env.API_KEY : '';
+                return responder(msg, '🌐 *Painel Remoto do Jarvis:*\n' + url + keyParam + '\n\nAcesso seguro de qualquer distância (4G/5G).');
+            } else {
+                return responder(msg, '⚠️ O túnel remoto ainda está iniciando. Tente novamente em alguns segundos.');
+            }
+        }
         if (comando === '!ajuda') return responder(msg, mensagemAjuda());
         if (comando === '!hora')  return responder(msg, `🕐 ${sistema.hora()}`);
 

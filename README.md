@@ -30,25 +30,33 @@ Planos, RAM)   Crystal 55")   (Alertas Zap)   (Responde Voz) Vídeos)
 
 ## 🚀 Todos os Recursos Implementados
 
-### 1. 🗣️ Jarvis Falante — Respostas em Áudio (TTS Neural)
+### 1. 🖥️ Executável Oficial do Windows (`Jarvis.exe`)
+* **Ativação com 1 Clique**: Um aplicativo nativo do Windows compilado sob medida com ícone próprio na sua Área de Trabalho.
+* Inicia o servidor Node.js e o túnel seguro de acesso remoto simultaneamente.
+* Exibe o status da porta 3000, link local e link HTTPS remoto para o Galaxy S23.
+* Opção de copiar o link do celular com um toque ou minimizar o Jarvis para rodar silenciosamente em segundo plano.
+
+### 2. 🌐 Acesso no Celular Independente da Distância
+* **Túnel Seguro Automático (Cloudflare Tunnel)**: O Jarvis inicia o túnel em segundo plano sem precisar configurar portas no roteador.
+* **Link Direto no WhatsApp**: Assim que o Jarvis é ativado, ele envia automaticamente o link do seu painel no seu WhatsApp (chat pessoal).
+* **Autenticação Instantânea**: O link já carrega o token seguro (`?key=...`), abrindo o PWA no Galaxy S23 logado de primeira.
+* **Comandos `!link` ou `!painel` no WhatsApp**: Peça o link a qualquer momento pelo chat caso precise reabrir.
+
+### 3. 🗣️ Jarvis Falante — Respostas em Áudio (TTS Neural)
 * **Respostas com Voz no WhatsApp**: Quando você envia um áudio, o Jarvis não só responde em texto como também manda uma **nota de voz com voz natural brasileira** no WhatsApp!
 * **Comando `!falar <texto>`**: Peça para o Jarvis falar qualquer mensagem via áudio.
 
-### 2. 🛡️ Monitoramento Proativo Autônomo (Ele te avisa no WhatsApp)
+### 4. 🛡️ Monitoramento Proativo Autônomo (Ele te avisa no WhatsApp)
 O Jarvis monitora o Dell G15 silenciosamente a cada 2 minutos em segundo plano:
 * **Alerta de Bateria Crítica**: Se o notebook estiver fora da tomada e a bateria cair para **<= 20%**, você recebe um aviso no WhatsApp no S23 para ligar na tomada antes que desligue.
 * **Alerta Térmico da RTX**: Se a placa de vídeo atingir **>= 85°C**, ele te avisa para ventilar o notebook.
 
-### 3. 📥 Downloader de Mídias e Torrents (`!baixar`)
+### 5. 📥 Downloader de Mídias e Torrents (`!baixar`)
 * `!baixar <link>`:
   * **Links Magnet de Torrent**: Inicia o download automaticamente no seu cliente de torrent (qBittorrent/uTorrent) no PC.
   * **Links de Vídeo**: Envie links do YouTube, Reels ou mídias para salvar direto na sua pasta de Downloads.
 
-### 4. 🌐 Acesso Externo Seguro (Cloudflare Tunnel com 1 Clique)
-* Dê dois cliques em **`iniciar_cloudflare_tunnel.bat`**.
-* O Jarvis gera um link seguro HTTPS gratuito (ex: `https://seu-link.trycloudflare.com`) para você abrir o Painel Web no seu Galaxy S23 de qualquer lugar do mundo (na academia, no 4G/5G, no trabalho).
-
-### 5. 📍 Webhooks para Modos e Rotinas do Samsung S23
+### 6. 📍 Webhooks para Modos e Rotinas do Samsung S23
 Rotas prontas para acionamento por geolocalização ou horário:
 * `/api/webhook/cheguei` ➔ Chegando em casa (liga TV, abre Spotify).
 * `/api/webhook/sair` ➔ Saindo de casa (desliga TV, bloqueia a tela do Windows).
@@ -62,6 +70,7 @@ Rotas prontas para acionamento por geolocalização ou horário:
 | Comando | Descrição |
 |---|---|
 | `!ajuda` | Mostra todos os comandos |
+| `!link` / `!painel` | Envia o link de acesso remoto seguro no Galaxy S23 |
 | `!gaming` | TV no HDMI, G15 em Alto Desempenho e Steam na tela grande |
 | `!pirata` | TV no HDMI, volume equilibrado e navegador em tela cheia |
 | `!trabalho` | Desliga a TV e foca no notebook |

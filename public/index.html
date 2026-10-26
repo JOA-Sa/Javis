@@ -454,6 +454,17 @@
     </div>
 
     <script>
+        // Suporte para chave automatica via URL (?key=SUA_CHAVE)
+        (function() {
+            try {
+                const p = new URLSearchParams(window.location.search);
+                if (p.has('key') && p.get('key')) {
+                    localStorage.setItem('jarvis_api_key', p.get('key').trim());
+                    window.history.replaceState({}, document.title, window.location.pathname);
+                }
+            } catch (e) {}
+        })();
+
         function getHeaders() {
             const key = localStorage.getItem('jarvis_api_key');
             return key ? { 'x-api-key': key } : {};
