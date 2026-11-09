@@ -402,7 +402,52 @@ const consultarTexto = async (promptTexto) => {
     return await chamarGemini(corpo);
 };
 
+
+/**
+ * Analisa uma imagem enviada pelo WhatsApp usando o Gemini Vision.
+ * Suporta perguntas sobre fotos, documentos, erros na tela, etc.
+ * 
+ * @param {string} base64Image Buffer em base64 da imagem
+ * @param {string} mimetype Tipo MIME (ex: image/jpeg, image/png)
+ * @param {string} legenda Pergunta ou contexto do usuário
+ * @returns {Promise<string>} Análise do Jarvis
+ */
+const analisarImagem = async (base64Image, mimetype, legenda = '') => {
+    if (!GEMINI_API_KEY()) {
+        return '👁️ Para analisar imagens e fotos com inteligência artificial, certifique-se de configurar a *GEMINI_API_KEY* no arquivo *.env*.';
+    }
+
+    try {
+        const promptPadrao = legenda && legenda.trim()
+            ? `Você é o Jarvis. O usuário enviou esta imagem com a seguinte solicitação: "${legenda.trim()}". Analise a imagem detalhadamente e responda com elegância e clareza.`
+            : `Você é o Jarvis. Analise esta imagem com máxima atenção e descreva os pontos mais relevantes, textos contidos (OCR), contexto ou detalhes importantes com elegância.`;
+
+        const corpo = {
+            contents: [
+                {
+                    parts: [
+                        { text: promptPadrao },
+                        {
+                            inlineData: {
+                                mimeType: mimetype || 'image/jpeg',
+                                data: base64Image,
+                            },
+                        },
+                    ],
+                },
+            ],
+        };
+
+        const resposta = await chamarGemini(corpo);
+        return resposta || 'Não consegui extrair detalhes suficientes desta imagem.';
+    } catch (err) {
+        console.error('[❌] Erro ao analisar imagem com Gemini:', err.message);
+        return '❌ Falha ao processar e analisar esta imagem com a IA: ' + err.message;
+    }
+};
+
 module.exports = {
+    analisarImagem,
     chamarGemini,
     consultarTexto,
     interpretarTexto,

@@ -14,6 +14,7 @@ const tunnel = require('../services/tunnel.service');
 const streaming = require('../services/streaming.service');
 const gamer = require('../services/gamer.service');
 const spotify = require('../services/spotify.service');
+const lembretes = require('../services/lembretes.service');
 
 // ─────────────────────────────────────────────────
 //  CLIENTE WHATSAPP COM AUTO-RECONEXÃO
@@ -64,6 +65,7 @@ const criarCliente = () => {
         // Inicia o monitoramento proativo de bateria e temperatura do Dell G15
         monitor.iniciarMonitor(clientAtual);
         gamer.iniciarMonitorGamer(clientAtual);
+        lembretes.iniciarServicoLembretes(clientAtual);
 
         // Notificação automática do link remoto para o próprio WhatsApp do usuário
         let linkEnviado = false;
@@ -99,6 +101,7 @@ const criarCliente = () => {
         console.log(`[⚠️] Bot desconectado: ${reason}`);
         monitor.pararMonitor();
         gamer.pararMonitorGamer();
+        lembretes.pararServicoLembretes();
         tentarReconectar(clientAtual);
     });
 
@@ -264,6 +267,10 @@ const mensagemAjuda = () => [
     '• *!tocar <música>* — Toca no Spotify do Dell G15 ou TV',
     '• *!mp3 <link>* — Extrai áudio MP3 de vídeo e manda no WhatsApp',
     '• *!bomdia* — Resumo matinal falado por voz neural',
+        '• *!lembrar em X min <tarefa>* — Agenda lembrete sonoro e no Zap',
+    '• *!lembretes* / *!dellemb <n>* — Lista ou remove lembretes agendados',
+    '• *!jogos* / *!addjogo <proc> <nome>* — Gerencia títulos detectados para o Dell G15',
+    '• *Foto/Imagem* — Envie qualquer foto com pergunta para análise com Gemini Vision',
     '• *!clip <texto>* — Copia texto direto para o Ctrl+V do PC',
     '• *!organizar* — Organiza arquivos da pasta Downloads',
     '• *!baixar <link>* — Baixa vídeo ou magnet de torrent',
@@ -480,6 +487,24 @@ async function handleMensagem(msg) {
     }
 
     // ── 1. Tratamento de Áudios de Voz (PTT e Mídia) ────────
+        // ── 1.1 Tratamento de Imagens e Fotos (Gemini Vision) ────
+    if (msg.hasMedia && msg.type === 'image') {
+        console.log('[👁️] Mensagem de imagem recebida — analisando com Gemini Vision...');
+        try {
+            reagir(msg, '⏳');
+            const media = await msg.downloadMedia();
+            if (media && media.data) {
+                const legenda = (msg.body || '').trim();
+                const analise = await ia.analisarImagem(media.data, media.mimetype, legenda);
+                return responder(msg, `👁️ *Análise do Jarvis:*\n\n${analise}`);
+            }
+        } catch (err) {
+            console.error('[❌] Erro ao processar imagem:', err.message);
+            return responder(msg, '❌ Não foi possível analisar a imagem: ' + err.message);
+        }
+        return;
+    }
+
     if (msg.hasMedia && (msg.type === 'audio' || msg.type === 'ptt')) {
         console.log('[🎙️] Mensagem de áudio recebida');
         try {
@@ -558,6 +583,76 @@ async function handleMensagem(msg) {
                 return responder(msg, '⚠️ O túnel remoto ainda está iniciando. Tente novamente em alguns segundos.');
             }
         }
+                // ⏰ Lembretes e Alarmes
+        if (comando === '!lembrar' || comando === '!lembrete') {
+            const resto = partes.slice(1).join(' ').trim();
+            if (!resto) {
+                return responder(msg, '❌ Uso: *!lembrar em 30 min <mensagem>* ou *!lembrar 18:30 <mensagem>*\nExemplo: *!lembrar em 15 min tirar o bolo do forno*');
+            }
+
+            const matchEm = resto.match(/^(?:em\s+)?(\d+\s*(?:minutos?|mins?|m|horas?|hrs?|h|segundos?|segs?|s))\s+(.+)$/i);
+            const matchHora = resto.match(/^([01]?\d|2[0-3]:[0-5]\d)\s+(.+)$/);
+
+            let tempoMs = null;
+            let textoLembrete = '';
+
+            if (matchEm) {
+                tempoMs = lembretes.interpretarTempo(matchEm[1]);
+                textoLembrete = matchEm[2];
+            } else if (matchHora) {
+                tempoMs = lembretes.interpretarTempo(matchHora[1]);
+                textoLembrete = matchHora[2];
+            } else {
+                return responder(msg, '❌ Não entendi o horário. Use:\n• *!lembrar em 45 min <texto>*\n• *!lembrar 14:30 <texto>*');
+            }
+
+            try {
+                const criado = lembretes.adicionarLembrete(textoLembrete, tempoMs);
+                const dataFmt = new Date(criado.timestamp).toLocaleTimeString('pt-BR', { timeZone: 'America/Sao_Paulo', hour: '2-digit', minute: '2-digit' });
+                return responder(msg, `⏰ Lembrete agendado para às *${dataFmt}*!\n📝 "${textoLembrete}"\nEu te avisarei aqui quando chegar a hora.`);
+            } catch (e) {
+                return responder(msg, '❌ Falha ao agendar lembrete: ' + e.message);
+            }
+        }
+
+        if (comando === '!lembretes') {
+            const lista = lembretes.listarLembretes();
+            if (lista.length === 0) {
+                return responder(msg, '⏰ Nenhum lembrete pendente no momento.\nPara criar use *!lembrar em 30 min <tarefa>*');
+            }
+            return responder(msg, `⏰ *Lembretes Ativos (${lista.length}):*\n\n${lista.join('\n')}\n\n_Para remover use: !dellemb <número>_`);
+        }
+
+        if (comando === '!dellemb') {
+            const idOuNum = partes[1];
+            if (!idOuNum) return responder(msg, '❌ Uso: *!dellemb <número do lembrete>*\nConsulte a numeração com *!lembretes*');
+            const rem = lembretes.removerLembrete(idOuNum);
+            if (rem) return responder(msg, `✅ Lembrete "${rem.texto}" removido com sucesso!`);
+            return responder(msg, '❌ Lembrete não encontrado.');
+        }
+
+        // 🎮 Central de Jogos Customizados
+        if (comando === '!jogos') {
+            return responder(msg, gamer.listarJogos());
+        }
+
+        if (comando === '!addjogo') {
+            const proc = partes[1];
+            const nomeJogo = partes.slice(2).join(' ');
+            if (!proc || !nomeJogo) {
+                return responder(msg, '❌ Uso: *!addjogo <nome_do_processo> <Nome Oficial do Jogo>*\nExemplo: *!addjogo monsterhunter Monster Hunter Wilds*');
+            }
+            const res = gamer.adicionarJogo(proc, nomeJogo);
+            return responder(msg, `✅ ${res}`);
+        }
+
+        if (comando === '!deljogo') {
+            const proc = partes[1];
+            if (!proc) return responder(msg, '❌ Uso: *!deljogo <nome_do_processo>*\nExemplo: *!deljogo monsterhunter*');
+            const res = gamer.removerJogo(proc);
+            return responder(msg, `✅ ${res}`);
+        }
+
         if (comando === '!ajuda') return responder(msg, mensagemAjuda());
         if (comando === '!hora')  return responder(msg, `🕐 ${sistema.hora()}`);
 
