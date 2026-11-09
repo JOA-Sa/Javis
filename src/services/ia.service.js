@@ -3,10 +3,7 @@ const https = require('https');
 const GEMINI_API_KEY = () => process.env.GEMINI_API_KEY;
 const GEMINI_MODEL = () => {
     const configurado = process.env.GEMINI_MODEL?.trim();
-    if (!configurado || configurado === 'gemini-3.8-flash') {
-        return 'gemini-2.5-flash';
-    }
-    return configurado;
+    return configurado || 'gemini-2.5-flash';
 };
 
 const COMANDOS_PERMITIDOS = new Set([
