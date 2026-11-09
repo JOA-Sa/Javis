@@ -10,7 +10,7 @@ const COMANDOS_PERMITIDOS = new Set([
     'gaming', 'pirata', 'trabalho', 'espelho', 'noturno', 'silencio',
     'screenshot', 'pc', 'volume', 'brilho', 'suspender', 'tv', 'midia',
     'bloquear', 'limpar', 'desligar', 'reiniciar', 'cancelar', 'spotify',
-    'tempo', 'processos', 'briefing', 'foco', 'conversa', 'assistir', 'clip', 'organizar', 'mp3',
+    'tempo', 'processos', 'briefing', 'foco', 'conversa', 'assistir', 'clip', 'organizar', 'mp3', 'dizer', 'acoes',
 ]);
 
 
@@ -62,6 +62,16 @@ const sanitizarIntencao = (dados) => {
         : '';
     if (!COMANDOS_PERMITIDOS.has(comando)) return conversaSegura();
     if (comando === 'conversa') return conversaSegura();
+
+    if (comando === 'acoes') {
+        const subAcoes = Array.isArray(dados.acoes) ? dados.acoes : [];
+        return {
+            comando: 'acoes',
+            acoes: subAcoes.map(a => sanitizarIntencao(a)).filter(a => a.comando !== 'conversa'),
+            resposta: resposta || 'Executando múltiplas ações coordenadas.',
+        };
+    }
+
 
     let parametro;
     if (comando === 'volume' || comando === 'brilho') {
@@ -153,7 +163,10 @@ Seu objetivo é interpretar a mensagem (seja texto ou áudio) e categorizar a in
 
 Responda ESTRITAMENTE em formato JSON (sem blocos markdown, apenas o JSON puro):
 {
-  "comando": "assistir" | "spotify" | "gaming" | "pirata" | "trabalho" | "espelho" | "noturno" | "silencio" | "screenshot" | "pc" | "volume" | "brilho" | "suspender" | "tv" | "midia" | "bloquear" | "limpar" | "desligar" | "briefing" | "organizar" | "clip" | "mp3" | "baixar" | "conversa",
+  "comando": "assistir" | "spotify" | "gaming" | "pirata" | "trabalho" | "espelho" | "noturno" | "silencio" | "screenshot" | "pc" | "volume" | "brilho" | "suspender" | "tv" | "midia" | "bloquear" | "limpar" | "desligar" | "briefing" | "organizar" | "clip" | "mp3" | "baixar" | "dizer" | "acoes" | "conversa",
+  // NOVO: Quando o usuário pedir mais de uma coisa na mesma frase (ex: "coloca no modo noturno e desliga a tv"):
+  // Use comando="acoes" e inclua um array "acoes": [ { "comando": "...", "parametro": ... }, { "comando": "...", "parametro": ... } ]
+  // Para falar algo nos alto-falantes do PC: comando="dizer", parametro="texto a ser dito"
   // IMPORTANTE:
   // - Para "gostaria de assistir X", "onde passa X", "quero ver X": use comando="assistir", parametro="Nome do filme ou serie"
   // - Para "tocar X", "toca queen", "ouvir musica": use comando="spotify", parametro="Nome da musica ou playlist"

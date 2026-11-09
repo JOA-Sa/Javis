@@ -2,6 +2,7 @@ const https = require('https');
 const fs = require('fs');
 const path = require('path');
 const os = require('os');
+const { exec } = require('child_process');
 
 /**
  * Gera um arquivo de áudio MP3 em Português Brasileiro (voz natural)
@@ -40,4 +41,41 @@ const falar = (texto) => {
     });
 };
 
-module.exports = { falar };
+/**
+ * Fala o texto diretamente nos alto-falantes físicos do Dell G15.
+ * Se houver conexão de internet, utiliza o MP3 neural reproduzido via PowerShell / Media.SoundPlayer.
+ * Se falhar ou estiver offline, faz fallback para a SAPI nativa do Windows (System.Speech).
+ * 
+ * @param {string} texto Frase a ser dita no computador
+ * @returns {Promise<string>} Confirmação de áudio reproduzido
+ */
+const falarNoPC = async (texto) => {
+    if (!texto || typeof texto !== 'string' || !texto.trim()) {
+        throw new Error('Informe o texto para o Jarvis falar.');
+    }
+    const textoLimpo = texto.trim();
+
+    try {
+        const audioPath = await falar(textoLimpo);
+        // Toca o MP3 gerado nos alto-falantes do Windows via MediaPlayer do WPF/PowerShell
+        const psCmd = `Add-Type -AssemblyName presentationCore; $player = New-Object System.Windows.Media.MediaPlayer; $player.Open([System.Uri]'${audioPath.replace(/\\/g, '/')}'); $player.Play(); Start-Sleep -Seconds 4; $player.Close()`;
+        
+        await new Promise((resolve) => {
+            exec(`powershell -NoProfile -Command "${psCmd}"`, { windowsHide: true }, () => {
+                fs.unlink(audioPath, () => {});
+                resolve();
+            });
+        });
+        return `Voz reproduzida nos alto-falantes do Dell G15: "${textoLimpo}"`;
+    } catch (e) {
+        // Fallback para a voz do Windows SAPI nativa (offline)
+        const textoEscapado = textoLimpo.replace(/"/g, '`"').replace(/'/g, "''");
+        const sapiCmd = `Add-Type -AssemblyName System.Speech; $synth = New-Object System.Speech.Synthesis.SpeechSynthesizer; $synth.Speak('${textoEscapado}')`;
+        await new Promise((resolve) => {
+            exec(`powershell -NoProfile -Command "${sapiCmd}"`, { windowsHide: true }, () => resolve());
+        });
+        return `Voz nativa do Windows reproduzida no Dell G15: "${textoLimpo}"`;
+    }
+};
+
+module.exports = { falar, falarNoPC };

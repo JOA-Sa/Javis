@@ -15,6 +15,7 @@ const streaming = require('../services/streaming.service');
 const gamer = require('../services/gamer.service');
 const spotify = require('../services/spotify.service');
 const lembretes = require('../services/lembretes.service');
+const backup = require('../services/backup.service');
 
 // ─────────────────────────────────────────────────
 //  CLIENTE WHATSAPP COM AUTO-RECONEXÃO
@@ -271,6 +272,8 @@ const mensagemAjuda = () => [
     '• *!lembretes* / *!dellemb <n>* — Lista ou remove lembretes agendados',
     '• *!jogos* / *!addjogo <proc> <nome>* — Gerencia títulos detectados para o Dell G15',
     '• *Foto/Imagem* — Envie qualquer foto com pergunta para análise com Gemini Vision',
+        '• *!dizer <texto>* — Fala a frase nos alto-falantes físicos do PC',
+    '• *!backup* — Gera e envia arquivo ZIP de backup das configurações',
     '• *!clip <texto>* — Copia texto direto para o Ctrl+V do PC',
     '• *!organizar* — Organiza arquivos da pasta Downloads',
     '• *!baixar <link>* — Baixa vídeo ou magnet de torrent',
@@ -345,6 +348,17 @@ async function responderComVoz(msg, texto) {
 // ─────────────────────────────────────────────────
 
 async function executarIntencao(intencao, msg, eraAudio = false) {
+    if (!intencao || !intencao.comando) return;
+
+    // Suporte a Function Calling encadeado (múltiplas ações coordenadas)
+    if (intencao.comando === 'acoes' && Array.isArray(intencao.acoes)) {
+        if (intencao.resposta) await responder(msg, `🤖 ${intencao.resposta}`);
+        for (const subAcao of intencao.acoes) {
+            await executarIntencao(subAcao, msg, false);
+        }
+        return;
+    }
+
     if (!intencao || !intencao.comando) return;
 
     const { comando, parametro, resposta } = intencao;
@@ -439,6 +453,11 @@ async function executarIntencao(intencao, msg, eraAudio = false) {
             const nova = status.nao_perturbe ? 'desativar' : 'ativar';
             const res = await sistema.controleFoco(nova);
             return responder(msg, `🔕 ${res}`);
+        }
+                case 'dizer': {
+            const textoFala = parametro || resposta || '';
+            if (textoFala) await tts.falarNoPC(textoFala);
+            return responder(msg, `🔊 Falando nos alto-falantes do PC: "${textoFala}"`);
         }
         case 'screenshot': {
 
@@ -583,7 +602,36 @@ async function handleMensagem(msg) {
                 return responder(msg, '⚠️ O túnel remoto ainda está iniciando. Tente novamente em alguns segundos.');
             }
         }
-                // ⏰ Lembretes e Alarmes
+                        // 🔊 Voz física nos alto-falantes do Dell G15
+        if (comando === '!dizer' || comando === '!falarpc') {
+            const frase = partes.slice(1).join(' ').trim();
+            if (!frase) return responder(msg, '❌ Uso: *!dizer <frase a ser falada nos alto-falantes do PC>*\nEx: !dizer Seja bem-vindo de volta');
+            try {
+                const res = await tts.falarNoPC(frase);
+                return responder(msg, `🔊 ${res}`);
+            } catch (err) {
+                return responder(msg, '❌ Falha ao reproduzir voz no PC: ' + err.message);
+            }
+        }
+
+        // 💾 Backup Completo das Configurações do Jarvis
+        if (comando === '!backup') {
+            responder(msg, '⏳ Gerando pacote ZIP com suas configurações, lembretes e dados...');
+            try {
+                const zipPath = await backup.criarBackup();
+                const mediaZip = MessageMedia.fromFilePath(zipPath);
+                await client.sendMessage(msg.from, mediaZip, {
+                    caption: '💾 *Backup do Jarvis gerado com sucesso!*\nContém suas credenciais .env, lembretes e lista de jogos customizados.',
+                    sendMediaAsDocument: true,
+                });
+                fs.unlink(zipPath, () => {});
+                return responder(msg, '✅ Backup enviado com sucesso!');
+            } catch (err) {
+                return responder(msg, '❌ Falha ao gerar backup: ' + err.message);
+            }
+        }
+
+        // ⏰ Lembretes e Alarmes
         if (comando === '!lembrar' || comando === '!lembrete') {
             const resto = partes.slice(1).join(' ').trim();
             if (!resto) {

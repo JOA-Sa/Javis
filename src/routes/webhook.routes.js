@@ -1,3 +1,4 @@
+const tts = require('../services/tts.service');
 const express = require('express');
 const router = express.Router();
 const service = require('../services/modos.service');
@@ -12,6 +13,7 @@ router.all('/cheguei', async (req, res) => {
             await st.ligarTV().catch(() => {});
         }
         await service.abrirSpotify().catch(() => {});
+        await tts.falarNoPC('Bem-vindo de volta, senhor. Sistemas operando normalmente.').catch(() => {});
         res.json({ status: 'Sucesso', evento: 'Boas-vindas ativado!' });
     } catch (e) {
         res.status(500).json({ erro: e.message });
