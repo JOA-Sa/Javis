@@ -61,7 +61,7 @@ const verificarJogos = async () => {
             console.log(`[🎮] Jogo detectado: ${jogoEncontrado}! Ativando Alto Desempenho e liberando RAM...`);
 
             await dell.setModo('performance').catch(() => {});
-            await sistema.limparMemoria().catch(() => {});
+            await sistema.limparSistema().catch(() => {});
 
             if (clientZap && clientZap.info && clientZap.info.wid) {
                 const meJid = clientZap.info.wid._serialized;

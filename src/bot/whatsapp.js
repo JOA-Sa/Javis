@@ -195,6 +195,7 @@ const CENAS = {
     '!desligar':  { desc: '💤 Desliga o PC em 30s',                         fn: () => service.desligar(30) },
     '!reiniciar': { desc: '🔄 Reinicia o PC em 30s',                        fn: () => service.reiniciar(30) },
     '!cancelar':  { desc: '🛑 Cancela desligamento agendado',                fn: () => service.cancelarDesligamento() },
+    '!acordar':   { desc: '⚡ Wake-on-LAN — acorda o PC remotamente',        fn: () => sistema.acordarPC() },
 };
 
 const TV_CMDS = {
@@ -219,6 +220,10 @@ const TV_CMDS = {
     'voltar':   () => st.enviarTeclaTV('voltar'),
     'home':     () => st.enviarTeclaTV('home'),
     'menu':     () => st.enviarTeclaTV('menu'),
+    'max':      () => st.abrirAppTV('max'),
+    'hbomax':   () => st.abrirAppTV('hbomax'),
+    'apple':    () => st.abrirAppTV('apple'),
+    'globoplay':() => st.abrirAppTV('globoplay'),
 };
 
 
@@ -269,7 +274,9 @@ const mensagemAjuda = () => [
     '• *!tv ligar / desligar / mute*',
     '• *!tv volume [0-100]*',
     '• *!tv hdmi1 / hdmi2 / hdmi3*',
-    '• *!tv netflix / youtube / prime / disney*',
+    '• *!tv netflix / youtube / prime / disney / max / apple / globoplay*',
+    '• *!tv status* — Ver estado atual da Samsung Crystal 55\"',
+    '• *!acordar* — Wake-on-LAN: liga o PC remotamente',
 
     '\n*🎙️ Interação por Voz:*',
     'Envie áudios de voz ou frases naturais (ex: _"Jarvis, vou jogar"_, _"pausa o filme"_). Ele responderá em texto e áudio!',
@@ -710,6 +717,23 @@ async function handleMensagem(msg) {
                 const nivel = parseInt(partes[2]);
                 if (isNaN(nivel) || nivel < 0 || nivel > 100) return responder(msg, '❌ Uso: *!tv volume [0-100]*');
                 return responder(msg, `✅ ${await st.setVolumeTV(nivel)}`);
+            }
+
+            // Status da TV
+            if (sub === 'status') {
+                try {
+                    const tvSt = await st.statusTV();
+                    const estadoStr = [
+                        '*📺 Samsung Crystal 55" — Status:*',
+                        `🔌 Ligada: ${tvSt.ligada ? 'Sim ✅' : 'Não ❌'}`,
+                        `🔊 Volume: ${tvSt.volume ?? 'N/A'}`,
+                        `🔇 Mute: ${tvSt.mutado ? 'Sim' : 'Não'}`,
+                        `📡 Entrada: ${tvSt.input ?? 'N/A'}`,
+                    ].join('\n');
+                    return responder(msg, estadoStr);
+                } catch (e) {
+                    return responder(msg, `❌ Não foi possível obter status da TV: ${e.message}`);
+                }
             }
 
             const tvFn = sub && Object.prototype.hasOwnProperty.call(TV_CMDS, sub)

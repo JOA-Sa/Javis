@@ -272,9 +272,18 @@ const definirClipboard = async (texto) => {
         throw new Error('Informe o texto para copiar.');
     }
     const limpo = texto.trim();
-    const script = `Set-Clipboard -Value @'\n${limpo.replace(/'/g, "''")}\n'@`;
-    await executar(`powershell -NoProfile -Command "${script}"`);
-    return 'Texto copiado com sucesso para a Área de Transferência do Dell G15!';
+
+    // Seguro: escreve o texto em arquivo temporário para evitar injeção de shell
+    const tempFile = path.join(os.tmpdir(), `jarvis_clip_${Date.now()}.txt`);
+    try {
+        await fs.promises.writeFile(tempFile, limpo, 'utf8');
+        await executar(
+            `powershell -NoProfile -Command "Get-Content -Path '${tempFile}' -Raw | Set-Clipboard"`
+        );
+        return 'Texto copiado com sucesso para a Área de Transferência do Dell G15!';
+    } finally {
+        fs.unlink(tempFile, () => {});
+    }
 };
 
 /**

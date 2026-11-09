@@ -4,8 +4,10 @@ let timerMonitor = null;
 let ultimoAlertaBateria = 0;
 let ultimoAlertaGPU = 0;
 
-const COOLDOWN_BATERIA_MS = 60 * 60 * 1000; // 30 minutos
-const COOLDOWN_GPU_MS     = 60 * 60 * 1000; // 15 minutos
+const COOLDOWN_BATERIA_MS = () => (parseInt(process.env.COOLDOWN_BATERIA_MIN ?? 30)) * 60 * 1000;
+const COOLDOWN_GPU_MS     = () => (parseInt(process.env.COOLDOWN_GPU_MIN      ?? 15)) * 60 * 1000;
+const LIMIAR_BATERIA      = () => parseInt(process.env.ALERTA_BATERIA_PCT ?? 20);
+const LIMIAR_GPU          = () => parseInt(process.env.ALERTA_GPU_TEMP    ?? 85);
 
 /**
  * Inicia o monitoramento proativo em segundo plano do Dell G15.
@@ -26,8 +28,8 @@ const iniciarMonitor = (client) => {
             const meJid = client.info.wid._serialized;
 
             // 1. Alerta de Bateria Crítica (< 20% fora da tomada)
-            if (stats.bateria !== null && !stats.na_tomada && stats.bateria <= 20) {
-                if (agora - ultimoAlertaBateria > COOLDOWN_BATERIA_MS) {
+            if (stats.bateria !== null && !stats.na_tomada && stats.bateria <= LIMIAR_BATERIA()) {
+                if (agora - ultimoAlertaBateria > COOLDOWN_BATERIA_MS()) {
                     ultimoAlertaBateria = agora;
                     const msg = `⚠️ *Aviso do Jarvis:* A bateria do seu Dell G15 atingiu *${stats.bateria}%* e o carregador está desconectado. Conecte-o à tomada para evitar desligamento.`;
                     console.log('[⚠️] Disparando alerta de bateria baixa via WhatsApp');
@@ -36,8 +38,8 @@ const iniciarMonitor = (client) => {
             }
 
             // 2. Alerta de Superaquecimento da GPU NVIDIA RTX (>= 85°C)
-            if (stats.gpu_temp !== null && stats.gpu_temp >= 85) {
-                if (agora - ultimoAlertaGPU > COOLDOWN_GPU_MS) {
+            if (stats.gpu_temp !== null && stats.gpu_temp >= LIMIAR_GPU()) {
+                if (agora - ultimoAlertaGPU > COOLDOWN_GPU_MS()) {
                     ultimoAlertaGPU = agora;
                     const msg = `🔥 *Alerta Térmico do Jarvis:* A GPU NVIDIA do seu Dell G15 atingiu *${stats.gpu_temp}°C*. Recomendo verificar a ventilação ou elevar a base do notebook.`;
                     console.log('[🔥] Disparando alerta térmico de GPU via WhatsApp');

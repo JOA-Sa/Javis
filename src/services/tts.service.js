@@ -21,7 +21,7 @@ const falar = (texto) => {
         if (!textoLimpo) return reject(new Error('Texto vazio'));
 
         const caminhoArquivo = path.join(os.tmpdir(), `jarvis_fala_${Date.now()}.mp3`);
-        const url = `https://translate.google.com/translate_tts?ie=UTF-8&q=${encodeURIComponent(textoLimpo.slice(0, 200))}&tl=pt-BR&client=tw-ob`;
+        const url = `https://translate.google.com/translate_tts?ie=UTF-8&q=${encodeURIComponent(textoLimpo.slice(0, 500))}&tl=pt-BR&client=tw-ob`;
 
         const file = fs.createWriteStream(caminhoArquivo);
 

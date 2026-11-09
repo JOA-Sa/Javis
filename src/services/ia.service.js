@@ -156,7 +156,7 @@ Seu objetivo é interpretar a mensagem (seja texto ou áudio) e categorizar a in
 
 Responda ESTRITAMENTE em formato JSON (sem blocos markdown, apenas o JSON puro):
 {
-  "comando": "assistir" | "spotify" | "gaming" | "pirata" | "trabalho" | "espelho" | "noturno" | "silencio" | "screenshot" | "pc" | "volume" | "brilho" | "suspender" | "tv" | "midia" | "bloquear" | "limpar" | "desligar" | "briefing" | "organizar" | "clip" | "conversa",
+  "comando": "assistir" | "spotify" | "gaming" | "pirata" | "trabalho" | "espelho" | "noturno" | "silencio" | "screenshot" | "pc" | "volume" | "brilho" | "suspender" | "tv" | "midia" | "bloquear" | "limpar" | "desligar" | "briefing" | "organizar" | "clip" | "mp3" | "baixar" | "conversa",
   // IMPORTANTE:
   // - Para "gostaria de assistir X", "onde passa X", "quero ver X": use comando="assistir", parametro="Nome do filme ou serie"
   // - Para "tocar X", "toca queen", "ouvir musica": use comando="spotify", parametro="Nome da musica ou playlist"
