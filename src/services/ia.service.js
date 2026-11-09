@@ -406,6 +406,7 @@ const consultarTexto = async (promptTexto) => {
 };
 
 module.exports = {
+    chamarGemini,
     consultarTexto,
     interpretarTexto,
     interpretarAudio,

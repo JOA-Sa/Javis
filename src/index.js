@@ -20,6 +20,21 @@ app.use(express.json());
 // Dashboard Web estático para o Galaxy S23 e outros navegadores da rede local
 app.use(express.static(path.join(__dirname, '../public')));
 
+
+// Health-check unificado — sem autenticação para facilitar monitoramento externo
+app.get('/status', (req, res) => {
+    res.json({
+        jarvis: 'online',
+        versao: require('../package.json').version,
+        uptime_s: Math.floor(process.uptime()),
+        memoria_mb: Math.round(process.memoryUsage().rss / 1024 / 1024),
+        plataforma: process.platform,
+        node: process.version,
+        tunnel_url: tunnel.obterUrl() || null,
+        timestamp: new Date().toISOString(),
+    });
+});
+
 // Middleware de autenticação apenas para a API REST
 app.use('/api', autenticar);
 

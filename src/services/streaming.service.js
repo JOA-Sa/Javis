@@ -53,9 +53,17 @@ Importante:
 
     let info;
     try {
-        const respostaIa = await ia.chamarGemini(prompt);
-        const limpa = respostaIa.replace(/```json/g, '').replace(/```/g, '').trim();
-        info = JSON.parse(limpa);
+        const respostaIa = await ia.chamarGemini({
+            contents: [{ parts: [{ text: prompt }] }],
+        });
+        // Parse robusto: extrai o bloco JSON mesmo com markdown residual
+        const extrairJson = (texto) => {
+            const limpo = (texto || '').replace(/```json/gi, '').replace(/```/g, '').trim();
+            const match = limpo.match(/{[\s\S]*}/);
+            if (!match) throw new Error('Nenhum JSON encontrado na resposta da IA');
+            return JSON.parse(match[0]);
+        };
+        info = extrairJson(respostaIa);
     } catch (err) {
         console.error('[⚠️] Erro ao consultar catálogo com IA:', err.message);
         // Fallback básico caso o parse falhe
